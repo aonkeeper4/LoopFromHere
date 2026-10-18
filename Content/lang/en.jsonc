@@ -1,0 +1,12 @@
+{
+  "template_modid": {
+    "": "Template Mod",
+    "description": "This mod is the _Template Mod_, or someone *forgot* to exchange the description.",
+    "atoms": {
+      "test_atom": {
+        "": "Test Atom",
+        "elemental": "Elemental Test Atom"
+      }
+    }
+  }
+}

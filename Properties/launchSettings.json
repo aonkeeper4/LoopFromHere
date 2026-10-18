@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "MyModName": {
+      "commandName": "Project"
+    },
+    "Run With Opus Mutatum": {
+      "commandName": "Executable",
+      "executablePath": "D:\\C#_projects\\TemplateMod\\TestEnvironment\\OpusMutatum.exe",
+      "workingDirectory": "D:\\C#_projects\\TemplateMod\\TestEnvironment"
+    }
+  }
+}

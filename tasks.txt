@@ -1,0 +1,27 @@
+Tasks:
+* strings --onlyOnChange
+* intermediary --onlyOnChange
+* newMod -name "TemplateModFolderName"
+* copy -toMod "TemplateModFolderName" -from "D:\C#_projects\TemplateMod\modMeta.jsonc"
+* copy -toMod "TemplateModFolderName" -from "D:\C#_projects\TemplateMod\bin\Debug\net10.0\TemplateMod.dll"
+* copy -toMod "TemplateModFolderName" -from "D:\C#_projects\TemplateMod\bin\Debug\net10.0\TemplateMod.pdb"
+* copy -toMod "TemplateModFolderName" -from "D:\C#_projects\TemplateMod\bin\Debug\net10.0\TemplateMod.xml"
+* copy -toMod "TemplateModFolderName" -from "D:\C#_projects\TemplateMod\Content"
+* devMerge --onlyOnChange --mergeXML -id "template_modid" 
+* merge --onlyOnChange --asNamed
+* export -name "TemplateModFolderName" -outputPath "D:\C#_projects\TemplateMod\TestEnvironment\_builds"
+* run --readLogs -args "-devEnv -pseudoLang"
+
+AutoExit:
+  false
+
+# Included just to copy the tasks.txt into a versionned folder.
+# Comment out if you don't want to keep a spare copy of this in your repository.
+# CopyTasksPath:
+# D:\C#_projects\TemplateMod
+
+# Mods to also include in the devMerge task other than your direct dependencies. ( Replace # with * for list. )
+# Shoul be used with care, allways test without these optional dependencies enabled!
+# DevMods:
+# optional_dep_1
+# optional_dep_2
