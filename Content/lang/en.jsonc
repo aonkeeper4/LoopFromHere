@@ -1,12 +1,6 @@
 {
-  "template_modid": {
-    "": "Template Mod",
-    "description": "This mod is the _Template Mod_, or someone *forgot* to exchange the description.",
-    "atoms": {
-      "test_atom": {
-        "": "Test Atom",
-        "elemental": "Elemental Test Atom"
-      }
-    }
+  "loop_from_here": {
+    "": "Loop From Here",
+    "description": "A quality-of-life mod which allows solutions to start looping from an arbitrary point on the instruction tape.",
   }
 }
