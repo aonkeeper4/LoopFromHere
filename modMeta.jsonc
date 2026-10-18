@@ -1,15 +1,17 @@
 {
   "mod_id": "loop_from_here",
   "version": "0.0.1",
-  "mod_page_url": "",
-  "dll": "bin/LoopFromHere.dll",
   "authors": ["aonkeeper4"],
-  "icon": "textures/loop_from_here/icon",
+
+  "dll": "bin/LoopFromHere.dll",
   "mappings": "",
+  "icon": "textures/loop_from_here/icon",
+  "mod_page_url": "https://github.com/aonkeeper4/LoopFromHere",
+
   "dependencies": {
-    "quintessential_core": "[0.7.0,)",
-    "quintessential_data": "[0.7.0,)",
-    "quintessential_ui": "[0.7.0,)"
+    "quintessential_core": "[0.8.1,)",
+    "quintessential_data": "[0.8.1,)",
+    "quintessential_ui": "[0.8.1,)"
   },
-  "conflicts": []
+  "conflicts": [],
 }
