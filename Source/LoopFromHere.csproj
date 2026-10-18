@@ -49,7 +49,7 @@
             <Using Namespace="System.IO.Compression" />
             <Code Type="Fragment" Language="cs">
                 <![CDATA[
-                var projectDir = Path.Combine(@"$(ProjectDir)", ".."); // Go one level up, since we're inside the 'Source' directory
+                string projectDir = Path.Combine(@"$(ProjectDir)", ".."); // go one level up, since we're inside the 'Source' directory
                 projectDir = Uri.UnescapeDataString(projectDir);
 
                 if (File.Exists(OutputPath))
@@ -57,7 +57,7 @@
 
                 using (ZipArchive zip = ZipFile.Open(OutputPath, ZipArchiveMode.Create))
                 {
-                    foreach (var file in Files)
+                    foreach (ITaskItem file in Files)
                     {
                         string filePath = file.GetMetadata("FullPath");
                         string entryName = GetRelativePath(projectDir, filePath);
@@ -68,21 +68,22 @@
 
                 string GetRelativePath(string fromPath, string toPath)
                 {
-                    if (string.IsNullOrEmpty(fromPath)) throw new ArgumentNullException(nameof(fromPath));
-                    if (string.IsNullOrEmpty(toPath))   throw new ArgumentNullException(nameof(toPath));
+                    if (string.IsNullOrEmpty(fromPath))
+                        throw new ArgumentNullException(nameof(fromPath));
+                    if (string.IsNullOrEmpty(toPath))
+                        throw new ArgumentNullException(nameof(toPath));
 
                     Uri fromUri = new Uri(fromPath);
                     Uri toUri = new Uri(toPath);
 
-                    if (fromUri.Scheme != toUri.Scheme) { return toPath; } // path can't be made relative.
+                    if (fromUri.Scheme != toUri.Scheme)
+                        return toPath; // path can't be made relative
 
                     Uri relativeUri = fromUri.MakeRelativeUri(toUri);
                     string relativePath = Uri.UnescapeDataString(relativeUri.ToString());
 
                     if (toUri.Scheme.Equals("file", StringComparison.InvariantCultureIgnoreCase))
-                    {
                         relativePath = relativePath.Replace(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                    }
 
                     return relativePath;
                 }
