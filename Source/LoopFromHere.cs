@@ -7,11 +7,10 @@ internal class LoopFromHere : QuintessentialMod, IDataMod {
     public override string ModId => "loop_from_here";
 
     public override void Load() { }
+    public override void PostLoad() { }
+    public override void Unload() { }
 
     public override void LoadContent() { }
     public override void LoadCompatContent() { }
     public override void FinaliseContent() { }
-
-    public override void PostLoad() { }
-	public override void Unload() { }
 }

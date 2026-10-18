@@ -13,4 +13,4 @@ Tasks:
 # * optional_dep_2
 
 AutoExit:
-  false
+  true
