@@ -56,6 +56,7 @@ public class patch_CompiledProgramGrid {
         return positionInLoop + loopFromIndex;
     }
 
+    // is this right??
     [MonoModILInject("GetLoopedCycle")]
     public static void Patch_GetLoopedCycle(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `CompiledProgramGrid.GetLoopedCycle` to add support for custom looping behaviour...");
@@ -85,6 +86,7 @@ public class patch_CompiledProgramGrid {
         patch_CompiledProgramGrid programGrid = (patch_CompiledProgramGrid) (object) grid;
 
         int normalPeriod = 0, loopFromHerePeriod = 0;
+        bool useNewPeriod = false;
         foreach ((Part part, CompiledProgram program) in programGrid.programDict) {
             if (program.isOutOfCycle)
                 continue;
@@ -92,11 +94,12 @@ public class patch_CompiledProgramGrid {
             if (LoopFromHereComponent.LoopFromIndexForPart(part).GetOrDefault(out int loopFromIndex)) {
                 int period = program.instructions.Length - loopFromIndex;
                 loopFromHerePeriod = MathHelper.Lcm(loopFromHerePeriod, period);
+                useNewPeriod = true;
             } else
                 normalPeriod = program.instructions.Length;
         }
 
-        return MathHelper.Lcm(normalPeriod, loopFromHerePeriod);
+        return useNewPeriod ? MathHelper.Lcm(normalPeriod, loopFromHerePeriod) : orig;
     }
 
     [MonoModILInject("FromSolution")]
@@ -106,6 +109,7 @@ public class patch_CompiledProgramGrid {
         MethodReference m_CompiledProgramGrid_ShouldSkipVanillaCompilation = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_UseCustomCompilation");
         MethodReference m_CompiledProgramGrid_CompileProgramGrid = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_CompileProgramGrid");
 
+        // todo: reduce patch area? do we need to completely replace the vanilla compilation?
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
             ILLabel normalBehaviour = cursor.DefineLabel(), afterNormalBehaviour = cursor.DefineLabel();
@@ -159,7 +163,45 @@ public class patch_CompiledProgramGrid {
         => solution.parts.Any(p => p.HasComponent(LoopFromHereComponent.Id));
 
     private static Dictionary<Part, CompiledProgram> LoopFromHere_CompileProgramGrid(Dictionary<Part, SortedDictionary<int, CompiledInstruction>> partInstructions) {
-        // todo
-        throw new NotImplementedException();
+        int defaultPeriod = 0;
+        foreach ((Part part, SortedDictionary<int, CompiledInstruction> instructions) in partInstructions) {
+            if (part.HasComponent(LoopFromHereComponent.Id)
+                || instructions.Count <= 0 || instructions.Values.Any(i => i.type.category == InstructionCategory.Halt))
+                continue;
+
+            int period = instructions.Keys.Last() - instructions.Keys.First() + 1;
+            defaultPeriod = Math.Max(defaultPeriod, period);
+        }
+
+        Dictionary<Part, CompiledProgram> compiledProgramGrid = new();
+        foreach ((Part part, SortedDictionary<int, CompiledInstruction> instructions) in partInstructions) {
+            int startIndex = instructions.Keys.FirstOrDefault(0), endIndex = instructions.Keys.LastOrDefault(0);
+            bool hasLoopFromHere = part.HasComponent(LoopFromHereComponent.Id);
+            bool hasHalt = instructions.Values.Any(i => i.type.category == InstructionCategory.Halt);
+            int tapeLength = hasLoopFromHere || hasHalt
+                ? endIndex - startIndex + 1 // in vanilla, halt arms have their instruction tape padded to at least match the period of the other arms. i think it's ok to not do that here
+                : defaultPeriod;
+
+            CompiledProgram partProgram = new() {
+                startIndex = startIndex,
+                instructions = new CompiledInstruction[tapeLength],
+                isOutOfCycle = hasHalt
+            };
+            bool isExpansion = false;
+            for (int i = 0; i < tapeLength; i++)
+            {
+                Maybe<CompiledInstruction> instruction = instructions.GetOrNone(startIndex + i);
+
+                partProgram.instructions[i] = instruction.GetOrDefault(new CompiledInstruction {
+                    type = InstructionTypes.idle,
+                    isExpansion = isExpansion
+                });
+                isExpansion = !instruction.HasValue();
+            }
+
+            compiledProgramGrid[part] = partProgram;
+        }
+
+        return compiledProgramGrid;
     }
 }
