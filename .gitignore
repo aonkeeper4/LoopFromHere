@@ -357,3 +357,6 @@ MigrationBackup/
 
 # Visual Studio Code
 .vscode/
+
+# OpusMutatum task files
+tasks.txt

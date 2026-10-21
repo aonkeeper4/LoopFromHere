@@ -1,4 +1,5 @@
-﻿using Quintessential;
+﻿using LoopFromHere.Components;
+using Quintessential;
 
 namespace LoopFromHere;
 
@@ -10,7 +11,9 @@ internal class LoopFromHere : QuintessentialMod, IDataMod {
     public override void PostLoad() { }
     public override void Unload() { }
 
-    public override void LoadContent() { }
+    public override void LoadContent() {
+        LoopFromHereComponent.Register();
+    }
     public override void LoadCompatContent() { }
     public override void FinaliseContent() { }
 }

@@ -3,14 +3,7 @@ Tasks:
 * intermediary --onlyOnChange
 * devMerge --onlyOnChange --mergeXML -id "loop_from_here"
 * merge --onlyOnChange --asNamed
-* run --readLogs -args "-devEnv -pseudoLang"
-
-# CopyTasksPath:
-# modded/Mods/LoopFromHere
-
-# DevMods:
-# * optional_dep_1
-# * optional_dep_2
+# * run --readLogs -args "-devEnv -pseudoLang"
 
 AutoExit:
   true
