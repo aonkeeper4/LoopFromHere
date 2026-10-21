@@ -77,7 +77,7 @@ public class patch_CompiledProgramGrid {
                 throw new Exception("Failed to patch `CompiledProgramGrid.GetLoopedCycle`: Unable to find assignment to `val` local to patch.");
 
             cursor.EmitLdarg0();
-            cursor.EmitCallvirt(m_CompiledProgramGrid_ModifyGifPeriod);
+            cursor.EmitCall(m_CompiledProgramGrid_ModifyGifPeriod);
         });
     }
 
@@ -132,7 +132,7 @@ public class patch_CompiledProgramGrid {
             cursor.EmitBrfalse(normalBehaviour);
 
             cursor.EmitLdloc0();
-            cursor.EmitCallvirt(m_CompiledProgramGrid_CompileProgramGrid);
+            cursor.EmitCall(m_CompiledProgramGrid_CompileProgramGrid);
             cursor.EmitStloc2();
             cursor.EmitBr(afterNormalBehaviour);
 

@@ -20,7 +20,7 @@
         <OpusMagnumPrefix>..\..\..</OpusMagnumPrefix>
     </PropertyGroup>
     <ItemGroup>
-        <Reference Include="$(OpusMagnumPrefix)\DevLightning.dll" Private="false"/>
+        <Reference Include="$(OpusMagnumPrefix)\DevLightning_LoopFromHere.dll" Private="false"/>
         <Reference Include="$(OpusMagnumPrefix)\Mono.Cecil.dll" Private="false"/>
         <Reference Include="$(OpusMagnumPrefix)\MonoMod.Patcher.dll" Private="false"/>
         <Reference Include="$(OpusMagnumPrefix)\MonoMod.Utils.dll" Private="false"/>
@@ -31,64 +31,4 @@
         <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="..\bin" />
         <Copy SourceFiles="$(OutputPath)\$(AssemblyName).pdb" DestinationFolder="..\bin" />
     </Target>
-
-    <!-- package the mod when building in release -->
-    <ItemGroup Condition="'$(DesignTimeBuild)' != 'true'">
-        <ZippedFiles Include="..\modMeta.jsonc;..\bin\**\*.*;..\Content\**\*.*" />
-    </ItemGroup>
-    <Target Name="PackageMod" AfterTargets="CopyFiles" Inputs="@(ZippedFiles)" Outputs="..\$(AssemblyName).zip" Condition="'$(Configuration)' == 'Release'">
-        <PackageMod Files="@(ZippedFiles)" OutputPath="..\$(AssemblyName).zip" />
-    </Target>
-    <UsingTask TaskName="PackageMod" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
-        <ParameterGroup>
-            <Files ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
-            <OutputPath ParameterType="System.String" Required="true" />
-        </ParameterGroup>
-        <Task>
-            <Using Namespace="System.IO" />
-            <Using Namespace="System.IO.Compression" />
-            <Code Type="Fragment" Language="cs">
-                <![CDATA[
-                string projectDir = Path.Combine(@"$(ProjectDir)", ".."); // go one level up, since we're inside the 'Source' directory
-                projectDir = Uri.UnescapeDataString(projectDir);
-
-                if (File.Exists(OutputPath))
-                    File.Delete(OutputPath);
-
-                using (ZipArchive zip = ZipFile.Open(OutputPath, ZipArchiveMode.Create))
-                {
-                    foreach (ITaskItem file in Files)
-                    {
-                        string filePath = file.GetMetadata("FullPath");
-                        string entryName = GetRelativePath(projectDir, filePath);
-
-                        zip.CreateEntryFromFile(filePath, entryName);
-                    }
-                }
-
-                string GetRelativePath(string fromPath, string toPath)
-                {
-                    if (string.IsNullOrEmpty(fromPath))
-                        throw new ArgumentNullException(nameof(fromPath));
-                    if (string.IsNullOrEmpty(toPath))
-                        throw new ArgumentNullException(nameof(toPath));
-
-                    Uri fromUri = new Uri(fromPath);
-                    Uri toUri = new Uri(toPath);
-
-                    if (fromUri.Scheme != toUri.Scheme)
-                        return toPath; // path can't be made relative
-
-                    Uri relativeUri = fromUri.MakeRelativeUri(toUri);
-                    string relativePath = Uri.UnescapeDataString(relativeUri.ToString());
-
-                    if (toUri.Scheme.Equals("file", StringComparison.InvariantCultureIgnoreCase))
-                        relativePath = relativePath.Replace(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-
-                    return relativePath;
-                }
-            ]]>
-            </Code>
-        </Task>
-    </UsingTask>
 </Project>
