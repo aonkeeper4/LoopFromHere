@@ -17,7 +17,7 @@ public class patch_CompiledProgramGrid {
     public static void Patch_GetInstructionForPart(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `CompiledProgramGrid.GetInstructionForPart` to add support for custom looping behaviour...");
 
-        MethodReference m_CompiledProgramGrid_ModifyInstructionIndex = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_ModifyInstructionIndex");
+        MethodDefinition m_CompiledProgramGrid_ModifyInstructionIndex = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_ModifyInstructionIndex");
 
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
@@ -56,12 +56,12 @@ public class patch_CompiledProgramGrid {
         return positionInLoop + loopFromIndex;
     }
 
-    // is this right??
+    // todo: do we really need to il patch? should this be on `SolutionRecorderScreen` instead?
     [MonoModILInject("GetLoopedCycle")]
     public static void Patch_GetLoopedCycle(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `CompiledProgramGrid.GetLoopedCycle` to add support for custom looping behaviour...");
 
-        MethodReference m_CompiledProgramGrid_ModifyGifPeriod = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_ModifyGifPeriod");
+        MethodDefinition m_CompiledProgramGrid_ModifyGifPeriod = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_ModifyGifPeriod");
 
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
@@ -106,8 +106,8 @@ public class patch_CompiledProgramGrid {
     public static void Patch_FromSolution(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `CompiledProgramGrid.FromSolution` to add support for custom looping behaviour...");
 
-        MethodReference m_CompiledProgramGrid_ShouldSkipVanillaCompilation = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_UseCustomCompilation");
-        MethodReference m_CompiledProgramGrid_CompileProgramGrid = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_CompileProgramGrid");
+        MethodDefinition m_CompiledProgramGrid_UseCustomCompilation = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_UseCustomCompilation");
+        MethodDefinition m_CompiledProgramGrid_CompileProgramGrid = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_CompileProgramGrid");
 
         // todo: reduce patch area? do we need to completely replace the vanilla compilation?
         new ILContext(method).Invoke(il => {
@@ -132,7 +132,7 @@ public class patch_CompiledProgramGrid {
                 throw new Exception("Failed to patch `CompiledProgramGrid.FromSolution`: Unable to find assignment to `num` local to patch.");
 
             cursor.EmitLdarg0();
-            cursor.EmitCall(m_CompiledProgramGrid_ShouldSkipVanillaCompilation);
+            cursor.EmitCall(m_CompiledProgramGrid_UseCustomCompilation);
             cursor.EmitBrfalse(normalBehaviour);
 
             cursor.EmitLdloc0();
@@ -161,7 +161,6 @@ public class patch_CompiledProgramGrid {
 
     private static bool LoopFromHere_UseCustomCompilation(Solution solution)
         => solution.parts.Any(p => p.HasComponent(LoopFromHereComponent.Id));
-
     private static Dictionary<Part, CompiledProgram> LoopFromHere_CompileProgramGrid(Dictionary<Part, SortedDictionary<int, CompiledInstruction>> partInstructions) {
         int defaultPeriod = 0;
         foreach ((Part part, SortedDictionary<int, CompiledInstruction> instructions) in partInstructions) {
@@ -179,7 +178,7 @@ public class patch_CompiledProgramGrid {
             bool hasLoopFromHere = part.HasComponent(LoopFromHereComponent.Id);
             bool hasHalt = instructions.Values.Any(i => i.type.category == InstructionCategory.Halt);
             int tapeLength = hasLoopFromHere || hasHalt
-                ? endIndex - startIndex + 1 // in vanilla, halt arms have their instruction tape padded to at least match the period of the other arms. i think it's ok to not do that here
+                ? endIndex - startIndex + 1 // in vanilla, halt arms have their instruction tape padded to be at least the period of the other arms. i think it's ok to not do that here
                 : defaultPeriod;
 
             CompiledProgram partProgram = new() {

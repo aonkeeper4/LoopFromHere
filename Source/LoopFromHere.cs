@@ -1,11 +1,14 @@
-﻿using LoopFromHere.Components;
+﻿using System;
+using LoopFromHere.Components;
 using Quintessential;
 
 namespace LoopFromHere;
 
 internal class LoopFromHere : QuintessentialMod, IDataMod {
-    public static LoopFromHere Instance { get; }
     public override string ModId => "loop_from_here";
+
+    public static LoopFromHere Instance { get; }
+    public override Type SettingsType => typeof(LoopFromHereSettings);
 
     public override void Load() { }
     public override void PostLoad() { }
