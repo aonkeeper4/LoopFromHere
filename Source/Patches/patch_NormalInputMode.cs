@@ -1,4 +1,3 @@
-using LoopFromHere;
 using LoopFromHere.UI;
 using MonoMod;
 
@@ -10,12 +9,11 @@ public class patch_NormalInputMode : NormalInputMode {
         if (nextInputMode.HasValue())
             return nextInputMode;
 
-        if (solEditScrn.GetSimPlayState() != SimPlayState.Stopped
-            || !solEditScrn.ProgramPanelContainsMouse()
-            || !LoopFromHereSettings.Instance.EditLoopRegions.Pressed())
-            return MaybeHelper.empty;
+        if (solEditScrn.GetSimPlayState() == SimPlayState.Stopped
+            && LoopRegionInputMode.EditingLoopRegions())
+            return MaybeHelper.Create(LoopRegionInputMode.StartInputMode(solEditScrn));
 
-        return MaybeHelper.Create(LoopRegionInputMode.StartInputMode(solEditScrn));
+        return MaybeHelper.empty;
     }
 }
 

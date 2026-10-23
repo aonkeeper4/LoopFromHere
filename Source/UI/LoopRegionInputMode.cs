@@ -1,15 +1,14 @@
+using SDL2;
+
 namespace LoopFromHere.UI;
 
-// todo: patch instruction insertion modes to move loop region start accordingly
-public class LoopRegionInputMode : IInputMode {
+internal class LoopRegionInputMode : IInputMode {
     public Maybe<IInputMode> Process(SolutionEditorScreen solEditScrn) {
-        bool leftClickPressed = InputManager.IsClickPressed(MouseButtonType.LeftClick),
-            rightClickPressed = InputManager.IsClickPressed(MouseButtonType.RightClick);
-
-        if ((!solEditScrn.ProgramPanelContainsMouse() && (leftClickPressed || rightClickPressed)) // "lose focus" when clicking somewhere else. todo: don't interrupt dragging?
-            || LoopFromHereSettings.Instance.EditLoopRegions.Pressed()) // exit normally
+        if (!EditingLoopRegions())
             return new NormalInputMode();
 
+        bool leftClickPressed = InputManager.IsClickPressed(MouseButtonType.LeftClick),
+            rightClickPressed = InputManager.IsClickPressed(MouseButtonType.RightClick);
         bool rightClickConsumed = false;
 
         // todo
@@ -28,4 +27,8 @@ public class LoopRegionInputMode : IInputMode {
         solEditScrn.method_2120(); // clear instruction selection
         return new LoopRegionInputMode();
     }
+
+    // no idea why i have to use `WhileKeyHeld`
+    public static bool EditingLoopRegions()
+        => InputManager.WhileKeyHeld(SDL.SDL_GetKeyFromName(LoopFromHereSettings.Instance.EditLoopRegions.Key));
 }

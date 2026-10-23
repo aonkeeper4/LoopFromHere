@@ -1,5 +1,6 @@
 ﻿using System;
 using LoopFromHere.Components;
+using LoopFromHere.UI;
 using Quintessential;
 
 namespace LoopFromHere;
@@ -15,7 +16,9 @@ internal class LoopFromHere : QuintessentialMod, IDataMod {
     public override void Unload() { }
 
     public override void LoadContent() {
-        LoopFromHereComponent.Register();
+        LoopRegionComponent.Register();
+
+        LoopRegionUI.LoadContent();
     }
     public override void LoadCompatContent() { }
     public override void FinaliseContent() { }

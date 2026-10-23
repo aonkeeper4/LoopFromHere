@@ -1,6 +1,6 @@
 namespace LoopFromHere.Helpers;
 
-public static class MathHelper {
+internal static class MathHelper {
     public static int Gcd(int a, int b)
         => b == 0 ? a : Gcd(b, a % b); // euclidean algorithm babyyy
 

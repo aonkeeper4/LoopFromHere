@@ -1,6 +1,7 @@
 using System.Linq;
 using LoopFromHere.Components;
 using MonoMod;
+using Quintessential.Components;
 
 public class patch_SolutionRecorderScreen : SolutionRecorderScreen {
     [MonoModIgnore]
@@ -14,15 +15,19 @@ public class patch_SolutionRecorderScreen : SolutionRecorderScreen {
     private bool WaitingForAnyPartToHalt() {
         // return true if we are waiting for any parts to finish non-looping behaviour (either waiting for them to halt or waiting for them to loop)
 
-        if (solutionEditor.GetSolution().parts.All(p => !p.HasComponent(LoopFromHereComponent.Id)))
+        if (solutionEditor.GetSolution().parts.All(p => !p.HasComponent(LoopRegionComponent.Id)))
             return orig_WaitingForAnyPartToHalt();
 
         int cycle = solutionEditor.GetSimulation().GetCycle();
         CompiledProgramGrid programGrid = solutionEditor.GetSimulation().GetProgram();
         foreach (Part part in solutionEditor.GetSolution().parts) {
             int startIndex = programGrid.GetProgramForPart(part).startIndex;
-            if (LoopFromHereComponent.LoopFromIndexForPart(part).GetOrDefault(out int loopFromIndex) && cycle < startIndex + loopFromIndex)
-                return true; // this part hasn't started looping yet
+
+            if (part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)) {
+                int loopFromIndex = ((LoopRegionComponent) component).LoopStartIndex;
+                if (cycle < startIndex + loopFromIndex)
+                    return true;
+            }
         }
 
         return orig_WaitingForAnyPartToHalt();

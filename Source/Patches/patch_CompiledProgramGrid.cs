@@ -7,6 +7,7 @@ using Mono.Cecil;
 using MonoMod;
 using MonoMod.Cil;
 using MonoMod.InlineRT;
+using Quintessential.Components;
 
 // can't inherit from `CompiledProgramGrid` bc the base ctor is private :(
 public class patch_CompiledProgramGrid {
@@ -43,8 +44,10 @@ public class patch_CompiledProgramGrid {
     }
 
     private static int LoopFromHere_ModifyInstructionIndex(int orig, int cycle, Part part, CompiledProgram program) {
-        if (!LoopFromHereComponent.LoopFromIndexForPart(part).GetOrDefault(out int loopFromIndex))
+        if (!part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
             return orig;
+
+        int loopFromIndex = ((LoopRegionComponent) component).LoopStartIndex;
 
         int cyclesSinceStart = cycle - program.startIndex;
         int cyclesSinceLooping = cyclesSinceStart - loopFromIndex;
@@ -91,8 +94,8 @@ public class patch_CompiledProgramGrid {
             if (program.isOutOfCycle)
                 continue;
 
-            if (LoopFromHereComponent.LoopFromIndexForPart(part).GetOrDefault(out int loopFromIndex)) {
-                int period = program.instructions.Length - loopFromIndex;
+            if (part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)) {
+                int period = program.instructions.Length - ((LoopRegionComponent) component).LoopStartIndex;
                 loopFromHerePeriod = MathHelper.Lcm(loopFromHerePeriod, period);
                 useNewPeriod = true;
             } else
@@ -160,11 +163,11 @@ public class patch_CompiledProgramGrid {
     }
 
     private static bool LoopFromHere_UseCustomCompilation(Solution solution)
-        => solution.parts.Any(p => p.HasComponent(LoopFromHereComponent.Id));
+        => solution.parts.Any(p => p.HasComponent(LoopRegionComponent.Id));
     private static Dictionary<Part, CompiledProgram> LoopFromHere_CompileProgramGrid(Dictionary<Part, SortedDictionary<int, CompiledInstruction>> partInstructions) {
         int defaultPeriod = 0;
         foreach ((Part part, SortedDictionary<int, CompiledInstruction> instructions) in partInstructions) {
-            if (part.HasComponent(LoopFromHereComponent.Id)
+            if (part.HasComponent(LoopRegionComponent.Id)
                 || instructions.Count <= 0 || instructions.Values.Any(i => i.type.category == InstructionCategory.Halt))
                 continue;
 
@@ -175,7 +178,7 @@ public class patch_CompiledProgramGrid {
         Dictionary<Part, CompiledProgram> compiledProgramGrid = new();
         foreach ((Part part, SortedDictionary<int, CompiledInstruction> instructions) in partInstructions) {
             int startIndex = instructions.Keys.FirstOrDefault(0), endIndex = instructions.Keys.LastOrDefault(0);
-            bool hasLoopFromHere = part.HasComponent(LoopFromHereComponent.Id);
+            bool hasLoopFromHere = part.HasComponent(LoopRegionComponent.Id);
             bool hasHalt = instructions.Values.Any(i => i.type.category == InstructionCategory.Halt);
             int tapeLength = hasLoopFromHere || hasHalt
                 ? endIndex - startIndex + 1 // in vanilla, halt arms have their instruction tape padded to be at least the period of the other arms. i think it's ok to not do that here

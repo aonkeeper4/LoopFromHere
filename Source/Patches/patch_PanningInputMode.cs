@@ -12,7 +12,7 @@ public class patch_PanningInputMode : PanningInputMode {
     public patch_PanningInputMode(SolutionEditorScreen solEditScrn, SolutionEditorPanel pannedItem) : base(solEditScrn, pannedItem) { }
 
     // `orig_`-style patching for constructors doesn't work yet
-    // neither does calling your patch methods `patch_Method`... even though that would be awesome
+    // neither does calling patch methods `patch_Method` weh
     [MonoModILInject(".ctor")]
     public static void Patch_ctor(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `PanningInputMode..ctor` to remember previous input mode...");

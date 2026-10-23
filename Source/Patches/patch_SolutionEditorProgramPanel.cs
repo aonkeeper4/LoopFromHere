@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using LoopFromHere.Components;
+using LoopFromHere.UI;
 using Mono.Cecil;
 using MonoMod;
 using MonoMod.Cil;
@@ -9,6 +10,16 @@ using MonoMod.InlineRT;
 public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
     [MonoModIgnore]
     public patch_SolutionEditorProgramPanel(SolutionEditorScreen solEditScrn) : base(solEditScrn) { }
+
+    [MonoModIgnore]
+    private extern bool orig_IsLimitReached(InstructionType instructionType);
+    private bool IsLimitReached(InstructionType instructionType) {
+        if (solEditScrn.GetSolution().parts.All(p => !p.HasComponent(LoopRegionComponent.Id)))
+            return orig_IsLimitReached(instructionType);
+
+        // remove period override limit
+        return !instructionType.isPeriodOverride && orig_IsLimitReached(instructionType);
+    }
 
     [MonoModILInject("RenderFrame")]
     public static void Patch_RenderFrame(MethodDefinition method, CustomAttribute attribute) {
@@ -35,13 +46,15 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
                     instr => instr.MatchBr(out _)))
                 throw new Exception("Failed to patch `SolutionEditorProgramPanel.RenderFrame`: Unable to find period highlight rendering to patch.");
 
-            cursor.EmitLdarg0();
-            cursor.EmitCallvirt(m_SolutionEditorProgramPanel_UseCustomPeriodRendering);
+            cursor.EmitLdloc0();
+            cursor.EmitCall(m_SolutionEditorProgramPanel_UseCustomPeriodRendering);
             cursor.EmitBrfalse(normalBehaviour);
 
             cursor.EmitLdarg0();
             cursor.EmitLdarg1();
             cursor.EmitLdloc0();
+            cursor.EmitLdloc(5);
+            cursor.EmitLdloc(6);
             cursor.EmitCallvirt(m_SolutionEditorProgramPanel_RenderPeriodHighlights);
             cursor.EmitBr(afterNormalBehaviour);
 
@@ -64,30 +77,43 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
 
             // todo: this match is flimsy
             /*
-             * IL_1174: ldloc.s 5
-             * IL_1176: stloc.s 95
-             * IL_1178: br IL_131b
+             * IL_1348: ldloc.s 95
+             * IL_134a: ldloc.s 6
+             * IL_134c: blt IL_11aa
              */
-            if (!cursor.TryGotoNext(MoveType.AfterLabel,
-                    instr => instr.MatchLdloc(5),
-                    instr => instr.MatchStloc(95),
-                    instr => instr.MatchBr(out _)))
-                throw new Exception("Failed to patch `SolutionEditorProgramPanel.RenderFrame`: Unable to find instruction highlight rendering to patch.");
+            if (!cursor.TryGotoNext(MoveType.After,
+                    instr => instr.MatchLdloc(95),
+                    instr => instr.MatchLdloc(6),
+                    instr => instr.MatchBlt(out _)))
+                throw new Exception("Failed to patch `SolutionEditorProgramPanel.RenderFrame`: Unable to find end of instruction rendering to patch.");
 
             cursor.EmitLdarg0();
             cursor.EmitLdarg1();
             cursor.EmitLdloc0();
+            cursor.EmitLdloc(5);
+            cursor.EmitLdloc(6);
             cursor.EmitCallvirt(m_SolutionEditorProgramPanel_RenderLoopRegionMarkers);
         });
     }
 
-    private bool LoopFromHere_UseCustomPeriodRendering()
-        => solEditScrn.GetSolution().parts.Any(p => p.HasComponent(LoopFromHereComponent.Id));
-    private void LoopFromHere_RenderPeriodHighlights(float deltaTime, PanelWParts panelWParts) {
+    private static bool LoopFromHere_UseCustomPeriodRendering(PanelWParts panel)
+        => panel.parts.Any(p => p.HasComponent(LoopRegionComponent.Id));
+    private void LoopFromHere_RenderPeriodHighlights(float deltaTime, PanelWParts panelWParts, int partsStartIndex, int partsEndIndex) {
         // todo
     }
 
-    private void LoopFromHere_RenderLoopRegionMarkers(float deltaTime, PanelWParts panelWParts) {
+    private void LoopFromHere_RenderLoopRegionMarkers(float deltaTime, PanelWParts panelWParts, int partsStartIndex, int partsEndIndex) {
         // todo
+        // render loop region markers
+
+        // render loop region placement indicator
+        if (solEditScrn.currentInputMode is LoopRegionInputMode) {
+
+        }
+    }
+
+    internal Maybe<(Part, int)> LoopFromHere_GetPartAndIndexAt(Vector2 screenPos) {
+        // todo
+        return MaybeHelper.empty;
     }
 }
