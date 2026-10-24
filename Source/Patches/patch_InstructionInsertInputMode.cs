@@ -8,9 +8,9 @@ using MonoMod.InlineRT;
 
 // todo:
 // while holding the edit loop regions keybind, make editing a program affect its loop region (including making it show in the held instructions if necessary)
-// make removing all instructions from a program delete its loop region
 // make adding a halt instruction to a program delete its loop region
-// after all other edits to a program have been processed this frame, if a loop region has no instructions to its right, delete it
+// make removing all instructions from a program delete its loop region
+// make removing all instructions to the right of a loop region delete it
 //
 // loop regions are solid on the left, sticky on the right
 public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
