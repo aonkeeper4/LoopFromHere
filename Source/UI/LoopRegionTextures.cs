@@ -1,6 +1,6 @@
 namespace LoopFromHere.UI;
 
-internal static class LoopRegionUI {
+internal static class LoopRegionTextures {
     public static Texture LoopRegionLeft, LoopRegionRight;
 
     public static void LoadContent() {

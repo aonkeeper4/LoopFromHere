@@ -5,16 +5,16 @@ using Quintessential.Serialization;
 
 namespace LoopFromHere.Components;
 
-internal class LoopRegionComponent(int loopStartIndex) : IPartComponent {
+internal class LoopRegionComponent : IPartComponent {
     public static readonly Identifier Id = LoopFromHere.Instance.GetIdentifier("loop_region");
     Identifier IComponentBase<Part>.Id => Id;
 
     public static readonly Codec<IPartComponent> Codec = Codec<IPartComponent>.Create(
-        Codecs.INT.Seal<IPartComponent>(nameof(LoopStartIndex), component => (component as LoopRegionComponent)!.LoopStartIndex), // cmon c# you can infer the type you can do it
-        loopFromIndex => new LoopRegionComponent(loopFromIndex)
+        Codecs.INT.Seal<IPartComponent>(nameof(LoopStartCycle), component => (component as LoopRegionComponent)!.LoopStartCycle), // cmon c# you can infer the type you can do it
+        loopFromIndex => new LoopRegionComponent { LoopStartCycle = loopFromIndex }
     );
 
-    public readonly int LoopStartIndex = loopStartIndex;
+    public int LoopStartCycle;
 
     public void OnBind(Part self) {
         if (!self.GetType().isProgrammable)
@@ -23,7 +23,7 @@ internal class LoopRegionComponent(int loopStartIndex) : IPartComponent {
     public void OnUnbind(Part self) { }
 
     public void OnClone(ref Part cloned, Solution solution)
-        => cloned.AddComponent(new LoopRegionComponent(LoopStartIndex));
+        => cloned.AddComponent(new LoopRegionComponent { LoopStartCycle = LoopStartCycle });
     public void OnReset() { }
 
     public static void Register()

@@ -7,6 +7,7 @@ using Mono.Cecil;
 using MonoMod;
 using MonoMod.Cil;
 using MonoMod.InlineRT;
+using Quintessential;
 using Quintessential.Components;
 
 // can't inherit from `CompiledProgramGrid` bc the base ctor is private :(
@@ -47,16 +48,15 @@ public class patch_CompiledProgramGrid {
         if (!part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
             return orig;
 
-        int loopFromIndex = ((LoopRegionComponent) component).LoopStartIndex;
+        int loopStartCycle = ((LoopRegionComponent) component).LoopStartCycle, loopStartIndex = loopStartCycle - program.startIndex;
 
-        int cyclesSinceStart = cycle - program.startIndex;
-        int cyclesSinceLooping = cyclesSinceStart - loopFromIndex;
+        int cyclesSinceStart = cycle - program.startIndex, cyclesSinceLooping = cycle - loopStartCycle;
         if (cyclesSinceLooping < 0)
             return cyclesSinceStart;
 
-        int period = program.instructions.Length - loopFromIndex;
+        int period = program.instructions.Length - loopStartIndex;
         int positionInLoop = cyclesSinceLooping % period;
-        return positionInLoop + loopFromIndex;
+        return positionInLoop + loopStartIndex;
     }
 
     // todo: do we really need to il patch? should this be on `SolutionRecorderScreen` instead?
@@ -64,7 +64,7 @@ public class patch_CompiledProgramGrid {
     public static void Patch_GetLoopedCycle(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `CompiledProgramGrid.GetLoopedCycle` to add support for custom looping behaviour...");
 
-        MethodDefinition m_CompiledProgramGrid_ModifyGifPeriod = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_ModifyGifPeriod");
+        MethodDefinition m_CompiledProgramGrid_ModifyTotalPeriod = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_ModifyTotalPeriod");
 
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
@@ -81,28 +81,30 @@ public class patch_CompiledProgramGrid {
                 throw new Exception("Failed to patch `CompiledProgramGrid.GetLoopedCycle`: Unable to find assignment to `val` local to patch.");
 
             cursor.EmitLdarg0();
-            cursor.EmitCall(m_CompiledProgramGrid_ModifyGifPeriod);
+            cursor.EmitCall(m_CompiledProgramGrid_ModifyTotalPeriod);
         });
     }
 
-    private static int LoopFromHere_ModifyGifPeriod(int orig, CompiledProgramGrid grid) {
+    // todo: is this right ??
+    private static int LoopFromHere_ModifyTotalPeriod(int orig, CompiledProgramGrid grid) {
         patch_CompiledProgramGrid programGrid = (patch_CompiledProgramGrid) (object) grid;
+        if (programGrid.programDict.Keys.All(p => !p.HasComponent(LoopRegionComponent.Id)))
+            return orig;
 
-        int normalPeriod = 0, loopFromHerePeriod = 0;
-        bool useNewPeriod = false;
+        int normalPeriod = 1, loopPeriod = 1;
         foreach ((Part part, CompiledProgram program) in programGrid.programDict) {
             if (program.isOutOfCycle)
                 continue;
 
             if (part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)) {
-                int period = program.instructions.Length - ((LoopRegionComponent) component).LoopStartIndex;
-                loopFromHerePeriod = MathHelper.Lcm(loopFromHerePeriod, period);
-                useNewPeriod = true;
+                int period = program.instructions.Length - (((LoopRegionComponent) component).LoopStartCycle - program.startIndex);
+                loopPeriod = MathHelper.Lcm(loopPeriod, period);
             } else
                 normalPeriod = program.instructions.Length;
         }
 
-        return useNewPeriod ? MathHelper.Lcm(normalPeriod, loopFromHerePeriod) : orig;
+        int finalPeriod = MathHelper.Lcm(normalPeriod, loopPeriod);
+        return finalPeriod;
     }
 
     [MonoModILInject("FromSolution")]
@@ -178,19 +180,18 @@ public class patch_CompiledProgramGrid {
         Dictionary<Part, CompiledProgram> compiledProgramGrid = new();
         foreach ((Part part, SortedDictionary<int, CompiledInstruction> instructions) in partInstructions) {
             int startIndex = instructions.Keys.FirstOrDefault(0), endIndex = instructions.Keys.LastOrDefault(0);
-            bool hasLoopFromHere = part.HasComponent(LoopRegionComponent.Id);
-            bool hasHalt = instructions.Values.Any(i => i.type.category == InstructionCategory.Halt);
-            int tapeLength = hasLoopFromHere || hasHalt
+            bool hasLoopFromHere = part.HasComponent(LoopRegionComponent.Id), hasHalt = instructions.Values.Any(i => i.type.category == InstructionCategory.Halt);
+            int period = hasLoopFromHere || hasHalt
                 ? endIndex - startIndex + 1 // in vanilla, halt arms have their instruction tape padded to be at least the period of the other arms. i think it's ok to not do that here
                 : defaultPeriod;
 
             CompiledProgram partProgram = new() {
                 startIndex = startIndex,
-                instructions = new CompiledInstruction[tapeLength],
+                instructions = new CompiledInstruction[period],
                 isOutOfCycle = hasHalt
             };
             bool isExpansion = false;
-            for (int i = 0; i < tapeLength; i++)
+            for (int i = 0; i < period; i++)
             {
                 Maybe<CompiledInstruction> instruction = instructions.GetOrNone(startIndex + i);
 

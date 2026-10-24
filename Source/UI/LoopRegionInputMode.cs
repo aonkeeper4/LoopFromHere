@@ -1,3 +1,6 @@
+using System.Linq;
+using LoopFromHere.Components;
+using Quintessential.Components;
 using SDL2;
 
 namespace LoopFromHere.UI;
@@ -7,14 +10,48 @@ internal class LoopRegionInputMode : IInputMode {
         if (!EditingLoopRegions())
             return new NormalInputMode();
 
+        Vector2 mousePos = InputManager.MousePos();
         bool leftClickPressed = InputManager.IsClickPressed(MouseButtonType.LeftClick),
             rightClickPressed = InputManager.IsClickPressed(MouseButtonType.RightClick);
-        bool rightClickConsumed = false;
 
-        // todo
+        patch_SolutionEditorProgramPanel programPanel = (patch_SolutionEditorProgramPanel) solEditScrn.programPanel;
+        bool editMade = false;
+        if (programPanel.ProgramAreaBounds().Contains(mousePos)
+            && programPanel.LoopFromHere_GetIndexAt(mousePos).GetOrDefault(out Index2 hoveredIndex)) {
+            Part hoveredPart = solEditScrn.GetSolution().GetOrderedProgrammables()[hoveredIndex.Y];
+            InstructionsWRef hoveredInstructions = hoveredPart.program.GetReferenceForPart(hoveredPart, solEditScrn.GetSolution().GetTrackUnderPart(hoveredPart));
 
-        if (rightClickPressed && !rightClickConsumed
-            && solEditScrn.programPanel.ProgramScrollAreaBounds().Contains(InputManager.MousePos()))
+            if (hoveredInstructions.program.Count > 0) {
+                int hoveredProgramEndIndex = hoveredInstructions.program.Keys.Max();
+                hoveredProgramEndIndex += hoveredInstructions.program[hoveredProgramEndIndex].expansion.Length - 1;
+                if (leftClickPressed
+                    && hoveredInstructions.program.Values.All(i => i.instruction.category != InstructionCategory.Halt)
+                    && hoveredIndex.X <= hoveredProgramEndIndex) {
+                    // place loop region
+                    if (hoveredPart.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
+                        ((LoopRegionComponent) component).LoopStartCycle = hoveredIndex.X;
+                    else
+                        hoveredPart.AddComponent(new LoopRegionComponent { LoopStartCycle = hoveredIndex.X });
+                    Assets.sounds.instruction_place.PlaySound(1f);
+
+                    leftClickPressed = false;
+                    editMade = true;
+                } else if (rightClickPressed
+                           && hoveredPart.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)
+                           && ((LoopRegionComponent) component).LoopStartCycle == hoveredIndex.X) {
+                    // remove loop region
+                    hoveredPart.RemoveComponent(LoopRegionComponent.Id);
+                    Assets.sounds.instruction_remove.PlaySound(1f);
+
+                    rightClickPressed = false;
+                    editMade = true;
+                }
+            }
+        }
+        if (editMade)
+            solEditScrn.MarkNeedsNewSnapshot(); // hopefully this works with custom components? if not, make it work
+
+        if (rightClickPressed && solEditScrn.programPanel.ProgramScrollAreaBounds().Contains(InputManager.MousePos()))
             return new PanningInputMode(solEditScrn, solEditScrn.programPanel);
 
         return MaybeHelper.empty;

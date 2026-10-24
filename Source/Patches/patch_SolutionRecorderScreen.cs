@@ -3,6 +3,7 @@ using LoopFromHere.Components;
 using MonoMod;
 using Quintessential.Components;
 
+// todo: make it work
 public class patch_SolutionRecorderScreen : SolutionRecorderScreen {
     [MonoModIgnore]
     private SimpleSolutionEditor solutionEditor;
@@ -19,15 +20,12 @@ public class patch_SolutionRecorderScreen : SolutionRecorderScreen {
             return orig_WaitingForAnyPartToHalt();
 
         int cycle = solutionEditor.GetSimulation().GetCycle();
-        CompiledProgramGrid programGrid = solutionEditor.GetSimulation().GetProgram();
         foreach (Part part in solutionEditor.GetSolution().parts) {
-            int startIndex = programGrid.GetProgramForPart(part).startIndex;
+            if (!part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
+                continue;
 
-            if (part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)) {
-                int loopFromIndex = ((LoopRegionComponent) component).LoopStartIndex;
-                if (cycle < startIndex + loopFromIndex)
-                    return true;
-            }
+            if (cycle < ((LoopRegionComponent) component).LoopStartCycle)
+                return true;
         }
 
         return orig_WaitingForAnyPartToHalt();

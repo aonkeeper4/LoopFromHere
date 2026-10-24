@@ -18,7 +18,7 @@ internal class LoopFromHere : QuintessentialMod, IDataMod {
     public override void LoadContent() {
         LoopRegionComponent.Register();
 
-        LoopRegionUI.LoadContent();
+        LoopRegionTextures.LoadContent();
     }
     public override void LoadCompatContent() { }
     public override void FinaliseContent() { }

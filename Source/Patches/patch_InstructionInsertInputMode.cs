@@ -6,12 +6,19 @@ using MonoMod;
 using MonoMod.Cil;
 using MonoMod.InlineRT;
 
+// todo:
+// while holding the edit loop regions keybind, make editing a program affect its loop region (including making it show in the held instructions if necessary)
+// make removing all instructions from a program delete its loop region
+// make adding a halt instruction to a program delete its loop region
+// after all other edits to a program have been processed this frame, if a loop region has no instructions to its right, delete it
+//
+// loop regions are solid on the left, sticky on the right
 public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
     [MonoModILInject("IInputMode InstructionInsertInputMode::StartInputMode(SolutionEditorScreen,Vector2)")]
     public static void Patch_StartInputMode(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `InstructionInsertInputMode.StartInputMode(SolutionEditorScreen solEditScrn, Vector2 startMousePos)` to remove period override instruction limit...");
 
-        MethodDefinition m_InstructionInsertInputMode_UncapPeriodOverrideLimit = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_UncapPeriodOverrideLimit");
+        MethodDefinition m_InstructionInsertInputMode_UncapPeriodOverrideLimit = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_RemovePeriodOverrideLimit");
 
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
@@ -34,8 +41,14 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
         });
     }
 
-    private static bool LoopFromHere_UncapPeriodOverrideLimit(bool orig, SolutionEditorScreen solEditScrn)
-        => orig && solEditScrn.GetSolution().parts.All(p => !p.HasComponent(LoopRegionComponent.Id));
+    // this conditional logic confuses me
+    private static bool LoopFromHere_RemovePeriodOverrideLimit(bool orig, SolutionEditorScreen solEditScrn)
+        => solEditScrn.GetSolution().parts.Any(p => p.HasComponent(LoopRegionComponent.Id)) || orig;
 
-    // todo: make instruction editing affect loop regions only while holding the keybind
+    [MonoModILInject("Process")]
+    public static void Patch_Process(MethodDefinition method, CustomAttribute attribute) {
+        MonoModRule.Modder.Log("[LoopFromHere] Patching `InstructionInsertInputMode.Process` to update loop regions when editing instructions...");
+
+        // todo
+    }
 }
