@@ -3,7 +3,6 @@ using LoopFromHere.Components;
 using MonoMod;
 using Quintessential.Components;
 
-// todo: make it work
 public class patch_SolutionRecorderScreen : SolutionRecorderScreen {
     [MonoModIgnore]
     private SimpleSolutionEditor solutionEditor;

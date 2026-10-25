@@ -16,40 +16,33 @@ internal class LoopRegionInputMode : IInputMode {
 
         patch_SolutionEditorProgramPanel programPanel = (patch_SolutionEditorProgramPanel) solEditScrn.programPanel;
         bool editMade = false;
-        if (programPanel.ProgramAreaBounds().Contains(mousePos)
-            && programPanel.LoopFromHere_GetIndexAt(mousePos).GetOrDefault(out Index2 hoveredIndex)) {
+        if (programPanel.LoopFromHere_GetIndexAt(mousePos).GetOrDefault(out Index2 hoveredIndex)) {
             Part hoveredPart = solEditScrn.GetSolution().GetOrderedProgrammables()[hoveredIndex.Y];
             InstructionsWRef hoveredInstructions = hoveredPart.program.GetReferenceForPart(hoveredPart, solEditScrn.GetSolution().GetTrackUnderPart(hoveredPart));
 
-            if (hoveredInstructions.program.Count > 0) {
-                int hoveredProgramEndIndex = hoveredInstructions.program.Keys.Max();
-                hoveredProgramEndIndex += hoveredInstructions.program[hoveredProgramEndIndex].expansion.Length - 1;
-                if (leftClickPressed
-                    && hoveredInstructions.program.Values.All(i => i.instruction.category != InstructionCategory.Halt)
-                    && hoveredIndex.X <= hoveredProgramEndIndex) {
-                    // place loop region
-                    if (hoveredPart.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
-                        ((LoopRegionComponent) component).LoopStartCycle = hoveredIndex.X;
-                    else
-                        hoveredPart.AddComponent(new LoopRegionComponent { LoopStartCycle = hoveredIndex.X });
-                    Assets.sounds.instruction_place.PlaySound(1f);
+            if (leftClickPressed && patch_SolutionEditorProgramPanel.LoopFromHere_CanPlaceLoopRegion(hoveredIndex, hoveredInstructions)) {
+                // place loop region
+                if (hoveredPart.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
+                    ((LoopRegionComponent) component).LoopStartCycle = hoveredIndex.X;
+                else
+                    hoveredPart.AddComponent(new LoopRegionComponent { LoopStartCycle = hoveredIndex.X });
+                Assets.sounds.instruction_place.PlaySound(1f);
 
-                    leftClickPressed = false;
-                    editMade = true;
-                } else if (rightClickPressed
-                           && hoveredPart.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)
-                           && ((LoopRegionComponent) component).LoopStartCycle == hoveredIndex.X) {
-                    // remove loop region
-                    hoveredPart.RemoveComponent(LoopRegionComponent.Id);
-                    Assets.sounds.instruction_remove.PlaySound(1f);
+                leftClickPressed = false;
+                editMade = true;
+            } else if (rightClickPressed
+                && hoveredPart.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)
+                && ((LoopRegionComponent) component).LoopStartCycle == hoveredIndex.X) {
+                // remove loop region
+                hoveredPart.RemoveComponent(LoopRegionComponent.Id);
+                Assets.sounds.instruction_remove.PlaySound(1f);
 
-                    rightClickPressed = false;
-                    editMade = true;
-                }
+                rightClickPressed = false;
+                editMade = true;
             }
         }
         if (editMade)
-            solEditScrn.MarkNeedsNewSnapshot(); // hopefully this works with custom components? if not, make it work
+            solEditScrn.MarkNeedsNewSnapshot();
 
         if (rightClickPressed && solEditScrn.programPanel.ProgramScrollAreaBounds().Contains(InputManager.MousePos()))
             return new PanningInputMode(solEditScrn, solEditScrn.programPanel);
@@ -58,10 +51,10 @@ internal class LoopRegionInputMode : IInputMode {
     }
     public void ProcessAfterFrame(SolutionEditorScreen solEditScrn) { }
 
-    public void method_2(SolutionEditorScreen solEditScrn) { }
+    public void RenderOverlay(SolutionEditorScreen solEditScrn) { }
 
     public static IInputMode StartInputMode(SolutionEditorScreen solEditScrn) {
-        solEditScrn.method_2120(); // clear instruction selection
+        solEditScrn.ClearInstrSelection();
         return new LoopRegionInputMode();
     }
 

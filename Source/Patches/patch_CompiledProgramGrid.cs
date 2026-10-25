@@ -7,19 +7,20 @@ using Mono.Cecil;
 using MonoMod;
 using MonoMod.Cil;
 using MonoMod.InlineRT;
-using Quintessential;
+using MonoMod.Utils;
 using Quintessential.Components;
 
 // can't inherit from `CompiledProgramGrid` bc the base ctor is private :(
 public class patch_CompiledProgramGrid {
     [MonoModIgnore]
-    private readonly Dictionary<Part, CompiledProgram> programDict;
+    [MonoModPublic] // used in `SolutionEditorProgramPanel.LoopFromHere_GetProgramEndIndicesFromProgramGrid`
+    public readonly Dictionary<Part, CompiledProgram> programDict;
 
     [MonoModILInject("GetInstructionForPart")]
     public static void Patch_GetInstructionForPart(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `CompiledProgramGrid.GetInstructionForPart` to add support for custom looping behaviour...");
 
-        MethodDefinition m_CompiledProgramGrid_ModifyInstructionIndex = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_ModifyInstructionIndex");
+        MethodDefinition m_CompiledProgramGrid_ModifyInstructionIndex = method.DeclaringType.FindMethod("LoopFromHere_ModifyInstructionIndex");
 
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
@@ -59,12 +60,11 @@ public class patch_CompiledProgramGrid {
         return positionInLoop + loopStartIndex;
     }
 
-    // todo: do we really need to il patch? should this be on `SolutionRecorderScreen` instead?
     [MonoModILInject("GetLoopedCycle")]
     public static void Patch_GetLoopedCycle(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `CompiledProgramGrid.GetLoopedCycle` to add support for custom looping behaviour...");
 
-        MethodDefinition m_CompiledProgramGrid_ModifyTotalPeriod = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_ModifyTotalPeriod");
+        MethodDefinition m_CompiledProgramGrid_ModifyTotalPeriod = method.DeclaringType.FindMethod("LoopFromHere_ModifyTotalPeriod");
 
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
@@ -85,36 +85,33 @@ public class patch_CompiledProgramGrid {
         });
     }
 
-    // todo: is this right ??
     private static int LoopFromHere_ModifyTotalPeriod(int orig, CompiledProgramGrid grid) {
         patch_CompiledProgramGrid programGrid = (patch_CompiledProgramGrid) (object) grid;
         if (programGrid.programDict.Keys.All(p => !p.HasComponent(LoopRegionComponent.Id)))
             return orig;
 
-        int normalPeriod = 1, loopPeriod = 1;
+        int defaultPeriod = 1, loopRegionPeriod = 1;
         foreach ((Part part, CompiledProgram program) in programGrid.programDict) {
-            if (program.isOutOfCycle)
+            if (program.isOutOfCycle || program.instructions.Length <= 0)
                 continue;
 
             if (part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)) {
                 int period = program.instructions.Length - (((LoopRegionComponent) component).LoopStartCycle - program.startIndex);
-                loopPeriod = MathHelper.Lcm(loopPeriod, period);
+                loopRegionPeriod = MathHelper.Lcm(loopRegionPeriod, period);
             } else
-                normalPeriod = program.instructions.Length;
+                defaultPeriod = program.instructions.Length;
         }
 
-        int finalPeriod = MathHelper.Lcm(normalPeriod, loopPeriod);
-        return finalPeriod;
+        return MathHelper.Lcm(defaultPeriod, loopRegionPeriod);
     }
 
     [MonoModILInject("FromSolution")]
     public static void Patch_FromSolution(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `CompiledProgramGrid.FromSolution` to add support for custom looping behaviour...");
 
-        MethodDefinition m_CompiledProgramGrid_UseCustomCompilation = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_UseCustomCompilation");
-        MethodDefinition m_CompiledProgramGrid_CompileProgramGrid = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_CompileProgramGrid");
+        MethodDefinition m_CompiledProgramGrid_UseCustomCompilation = method.DeclaringType.FindMethod("LoopFromHere_UseCustomCompilation");
+        MethodDefinition m_CompiledProgramGrid_CompileProgramGrid = method.DeclaringType.FindMethod("LoopFromHere_CompileProgramGrid");
 
-        // todo: reduce patch area? do we need to completely replace the vanilla compilation?
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
             ILLabel normalBehaviour = cursor.DefineLabel(), afterNormalBehaviour = cursor.DefineLabel();
@@ -170,16 +167,17 @@ public class patch_CompiledProgramGrid {
         int defaultPeriod = 0;
         foreach ((Part part, SortedDictionary<int, CompiledInstruction> instructions) in partInstructions) {
             if (part.HasComponent(LoopRegionComponent.Id)
-                || instructions.Count <= 0 || instructions.Values.Any(i => i.type.category == InstructionCategory.Halt))
+                || instructions.Count <= 0
+                || instructions.Values.Any(i => i.type.category == InstructionCategory.Halt))
                 continue;
 
-            int period = instructions.Keys.Last() - instructions.Keys.First() + 1;
+            int period = instructions.Keys.Max() - instructions.Keys.Min() + 1;
             defaultPeriod = Math.Max(defaultPeriod, period);
         }
 
         Dictionary<Part, CompiledProgram> compiledProgramGrid = new();
         foreach ((Part part, SortedDictionary<int, CompiledInstruction> instructions) in partInstructions) {
-            int startIndex = instructions.Keys.FirstOrDefault(0), endIndex = instructions.Keys.LastOrDefault(0);
+            int startIndex = instructions.Keys.MinOrDefault(0), endIndex = instructions.Keys.MaxOrDefault(0);
             bool hasLoopFromHere = part.HasComponent(LoopRegionComponent.Id), hasHalt = instructions.Values.Any(i => i.type.category == InstructionCategory.Halt);
             int period = hasLoopFromHere || hasHalt
                 ? endIndex - startIndex + 1 // in vanilla, halt arms have their instruction tape padded to be at least the period of the other arms. i think it's ok to not do that here

@@ -7,6 +7,7 @@ using Mono.Cecil;
 using MonoMod;
 using MonoMod.Cil;
 using MonoMod.InlineRT;
+using MonoMod.Utils;
 using Quintessential.Components;
 
 public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
@@ -44,18 +45,46 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
     public static void Patch_RenderFrame(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `SolutionEditorProgramPanel.RenderFrame` to add UI for custom looping behaviour...");
 
-        MethodDefinition m_SolutionEditorProgramPanel_UseCustomPeriodRendering = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_UseCustomPeriodRendering");
-        MethodDefinition m_SolutionEditorProgramPanel_RenderPeriodHighlights = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_RenderPeriodHighlights");
-        MethodDefinition m_SolutionEditorProgramPanel_RenderLoopRegionMarkers = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_RenderLoopRegionMarkers");
+        TypeDefinition t_SolutionEditorProgramPanel = method.DeclaringType;
+        MethodDefinition m_SolutionEditorProgramPanel_RenderLoopRegionMarkers = t_SolutionEditorProgramPanel.FindMethod("LoopFromHere_RenderLoopRegionMarkers")!;
+        MethodDefinition m_SolutionEditorProgramPanel_UseCustomPeriodRendering = t_SolutionEditorProgramPanel.FindMethod("LoopFromHere_UseCustomPeriodRendering")!;
+        MethodDefinition m_SolutionEditorProgramPanel_RenderPeriodHighlights = t_SolutionEditorProgramPanel.FindMethod("LoopFromHere_RenderPeriodHighlights")!;
+        MethodDefinition m_SolutionEditorProgramPanel_RenderLoopRegionPlacementIndicator = t_SolutionEditorProgramPanel.FindMethod("LoopFromHere_RenderLoopRegionPlacementIndicator")!;
+        MethodDefinition m_SolutionEditorProgramPanel_GetProgramEndIndicesFromProgramGrid = t_SolutionEditorProgramPanel.FindMethod("LoopFromHere_GetProgramEndIndicesFromProgramGrid")!;
+        MethodDefinition m_SolutionEditorProgramPanel_GetProgramEndIndicesFromInstructions = t_SolutionEditorProgramPanel.FindMethod("LoopFromHere_GetProgramEndIndicesFromInstructions")!;
 
-        // todo:
-        // reduce patch area? do we need to completely replace the vanilla period rendering?
-        // if a ghost instruction is about to be inserted past the end of the current tape, display a ghost loop region end marker
+        TypeDefinition t_InstructionHighlighter = t_SolutionEditorProgramPanel.NestedTypes.First(t => t.Name == "InstructionHighlighter");
+        FieldDefinition f_InstructionHighlighter_programGrid = t_InstructionHighlighter.FindField("programGrid")!;
+
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
-            ILLabel normalBehaviour = cursor.DefineLabel(), afterNormalBehaviour = cursor.DefineLabel();
+            ILLabel renderPeriodHighlights = cursor.DefineLabel(), afterRenderPeriodHighlights = cursor.DefineLabel();
 
-            // todo: this match is flimsy
+            /*
+             * IL_0992: call bool SolutionEditorProgramPanel::IsFastForwardHeld()
+             * IL_0997: brfalse IL_1355
+             * IL_099c: ldarg.0
+             * IL_099d: callvirt instance valuetype Bounds2 SolutionEditorProgramPanel::ProgramAreaBounds()
+             * IL_09a2: stloc.s 25
+             */
+            if (!cursor.TryGotoNext(MoveType.AfterLabel,
+                    instr => instr.MatchCall("SolutionEditorProgramPanel", "IsFastForwardHeld"),
+                    instr => instr.MatchBrfalse(out _),
+                    instr => instr.MatchLdarg0(),
+                    instr => instr.MatchCallvirt("SolutionEditorProgramPanel", "ProgramAreaBounds"),
+                    instr => instr.MatchStloc(25)))
+                throw new Exception("Failed to patch `SolutionEditorProgramPanel.RenderFrame`: Unable to find instruction highlight rendering to patch.");
+
+            cursor.EmitLdarg0();
+            cursor.EmitLdarg1();
+            cursor.EmitLdloc0();
+            cursor.EmitLdloc(5);
+            cursor.EmitLdloc(6);
+            cursor.EmitLdloc(40);
+            cursor.EmitLdfld(f_InstructionHighlighter_programGrid);
+            cursor.EmitCall(m_SolutionEditorProgramPanel_GetProgramEndIndicesFromProgramGrid);
+            cursor.EmitCallvirt(m_SolutionEditorProgramPanel_RenderLoopRegionMarkers);
+
             /*
              * IL_0c8a: ldloc.s 5
              * IL_0c8c: stloc.s 73
@@ -69,17 +98,18 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
 
             cursor.EmitLdloc0();
             cursor.EmitCall(m_SolutionEditorProgramPanel_UseCustomPeriodRendering);
-            cursor.EmitBrfalse(normalBehaviour);
+            cursor.EmitBrfalse(renderPeriodHighlights);
 
             cursor.EmitLdarg0();
             cursor.EmitLdarg1();
             cursor.EmitLdloc0();
             cursor.EmitLdloc(5);
             cursor.EmitLdloc(6);
+            cursor.EmitLdloc(65);
             cursor.EmitCallvirt(m_SolutionEditorProgramPanel_RenderPeriodHighlights);
-            cursor.EmitBr(afterNormalBehaviour);
+            cursor.EmitBr(afterRenderPeriodHighlights);
 
-            cursor.MarkLabel(normalBehaviour);
+            cursor.MarkLabel(renderPeriodHighlights);
 
             /*
              * IL_0dbd: ldarg.0
@@ -94,9 +124,8 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
                     instr => instr.MatchStloc(66)))
                 throw new Exception("Failed to patch `SolutionEditorProgramPanel.RenderFrame`: Unable to find assignment to `instructionAt2` local to patch.");
 
-            cursor.MarkLabel(afterNormalBehaviour);
+            cursor.MarkLabel(afterRenderPeriodHighlights);
 
-            // todo: this match is flimsy
             /*
              * IL_1348: ldloc.s 95
              * IL_134a: ldloc.s 6
@@ -114,29 +143,25 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
             cursor.EmitLdloc(5);
             cursor.EmitLdloc(6);
             cursor.EmitLdloc(65);
+            cursor.EmitCall(m_SolutionEditorProgramPanel_GetProgramEndIndicesFromInstructions);
             cursor.EmitCallvirt(m_SolutionEditorProgramPanel_RenderLoopRegionMarkers);
+
+            cursor.EmitLdarg0();
+            cursor.EmitLdarg1();
+            cursor.EmitLdloc0();
+            cursor.EmitLdloc(65);
+            cursor.EmitCallvirt(m_SolutionEditorProgramPanel_RenderLoopRegionPlacementIndicator);
         });
     }
 
-    private static bool LoopFromHere_UseCustomPeriodRendering(PanelWParts panel)
-        => panel.parts.Any(p => p.HasComponent(LoopRegionComponent.Id));
-    private void LoopFromHere_RenderPeriodHighlights(float deltaTime, PanelWParts panelWParts, int partsStartIndex, int partsEndIndex) {
-        // todo
-    }
-
-    private void LoopFromHere_RenderLoopRegionMarkers(float deltaTime, PanelWParts panelWParts, int partsStartIndex, int partsEndIndex, Dictionary<Part, InstructionsWRef> partInstructions) {
-        // render loop region markers
-        // todo: remember loop region positions so we can keep rendering them while e.g. instructions are being moved
+    private void LoopFromHere_RenderLoopRegionMarkers(float deltaTime, PanelWParts panelWParts, int partsStartIndex, int partsEndIndex, Dictionary<Part, int> partProgramEndIndices) {
         for (int i = partsStartIndex; i < partsEndIndex; i++) {
             Part part = panelWParts.parts[i];
-            InstructionsWRef instructions = partInstructions[part];
             if (!part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)
-                || instructions.program.Count <= 0)
+                || !partProgramEndIndices.TryGetValue(part, out int loopRegionEndIndex))
                 continue;
 
             int loopRegionStartIndex = ((LoopRegionComponent) component).LoopStartCycle;
-            int loopRegionEndIndex = instructions.program.Keys.Max();
-            loopRegionEndIndex += instructions.program[loopRegionEndIndex].expansion.Length - 1;
             if (loopRegionStartIndex >= panelWParts.lowerBound) {
                 Vector2 loopRegionStartPos = LoopFromHere_GetIndexEdgeCenter(new Index2(loopRegionStartIndex, i), rightEdge: false);
                 TextureRenderer.Render(LoopRegionTextures.LoopRegionLeft, loopRegionStartPos - LoopRegionTextures.LoopRegionLeft.GetHalfSize());
@@ -146,29 +171,103 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
                 TextureRenderer.Render(LoopRegionTextures.LoopRegionRight, loopRegionEndPos - LoopRegionTextures.LoopRegionRight.GetHalfSize());
             }
         }
+    }
 
-        // render loop region placement indicator
-        if (solEditScrn.currentInputMode is LoopRegionInputMode
-            && LoopFromHere_GetIndexAt(InputManager.MousePos()).GetOrDefault(out Index2 hoveredIndex)) {
-            Part hoveredPart = panelWParts.parts[hoveredIndex.Y];
-            InstructionsWRef hoveredInstructions = partInstructions[hoveredPart];
-            if (hoveredInstructions.program.Count <= 0)
-                return;
+    private static bool LoopFromHere_UseCustomPeriodRendering(PanelWParts panel)
+        => panel.parts.Any(p => p.HasComponent(LoopRegionComponent.Id));
+    private void LoopFromHere_RenderPeriodHighlights(float deltaTime, PanelWParts panelWParts, int partsStartIndex, int partsEndIndex, Dictionary<Part, InstructionsWRef> partInstructions) {
+        int defaultPeriod = 0;
+        Dictionary<Part, (int, int, bool, Maybe<LoopRegionComponent>)> partInfo = new();
+        foreach ((Part part, InstructionsWRef instructions) in partInstructions) {
+            if (!LoopFromHere_TryGetProgramInfo(instructions, out int programStartIndex, out int programEndIndex, out bool hasHalt))
+                continue;
 
-            int hoveredProgramEndIndex = hoveredInstructions.program.Keys.Max();
-            hoveredProgramEndIndex += hoveredInstructions.program[hoveredProgramEndIndex].expansion.Length - 1;
-            if (hoveredInstructions.program.Values.Any(i => i.instruction.category == InstructionCategory.Halt)
-                || hoveredIndex.X > hoveredProgramEndIndex)
-                return;
+            Maybe<LoopRegionComponent> loopRegionComponent = MaybeHelper.empty;
+            if (part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
+                loopRegionComponent = (LoopRegionComponent) component;
+            partInfo.Add(part, (programStartIndex, programEndIndex, hasHalt, loopRegionComponent));
+            if (hasHalt || loopRegionComponent.HasValue())
+                continue;
 
-            Vector2 loopRegionPos = LoopFromHere_GetIndexEdgeCenter(hoveredIndex, rightEdge: false);
-            TextureRenderer.Render(LoopRegionTextures.LoopRegionLeft, Color.White.WithAlpha(0.5f), loopRegionPos - LoopRegionTextures.LoopRegionLeft.GetHalfSize());
+            int period = programEndIndex - programStartIndex + 1;
+            defaultPeriod = Math.Max(defaultPeriod, period);
         }
+
+        for (int i = partsStartIndex; i < partsEndIndex; i++)
+        {
+            Part part = panelWParts.parts[i];
+            if (!partInfo.TryGetValue(part, out (int programStartIndex, int programEndIndex, bool hasHalt, Maybe<LoopRegionComponent> loopRegionComponent) info))
+                continue;
+
+            if (info.loopRegionComponent.GetOrDefault(out LoopRegionComponent component)) {
+                if (component.LoopStartCycle > info.programStartIndex)
+                    LoopFromHere_RenderHighlight(i, info.programStartIndex, component.LoopStartCycle - 1, Color.White);
+                LoopFromHere_RenderHighlight(i, component.LoopStartCycle, info.programEndIndex, Color.FromHex(0xf2c76d));
+            } else if (info.hasHalt)
+                LoopFromHere_RenderHighlight(i, info.programStartIndex, info.programEndIndex, Color.White);
+            else
+                LoopFromHere_RenderHighlight(i, info.programStartIndex, info.programStartIndex + defaultPeriod - 1, Color.White);
+        }
+    }
+    private void LoopFromHere_RenderHighlight(int partIndex, int startIndex, int endIndex, Color color) {
+        GetInstructionBounds(new Index2(startIndex, partIndex), out _, out Bounds2 highlightBounds);
+        highlightBounds.Max.X = highlightBounds.Min.X + instructionSize.X * (endIndex - startIndex + 1f);
+        highlightBounds.Min.Y += 1f;
+        highlightBounds.Max.Y -= 2f;
+
+        TextureRenderer.Render9Slice(Assets.textures.solution_editor.program_panel.program_length_glow, color.WithAlpha(0.6f), highlightBounds);
+    }
+
+    private void LoopFromHere_RenderLoopRegionPlacementIndicator(float deltaTime, PanelWParts panelWParts, Dictionary<Part, InstructionsWRef> partInstructions) {
+        if (solEditScrn.currentInputMode is not LoopRegionInputMode
+            || !LoopFromHere_GetIndexAt(InputManager.MousePos()).GetOrDefault(out Index2 hoveredIndex))
+            return;
+
+        InstructionsWRef hoveredInstructions = partInstructions[panelWParts.parts[hoveredIndex.Y]];
+        if (!LoopFromHere_CanPlaceLoopRegion(hoveredIndex, hoveredInstructions))
+            return;
+
+        Vector2 loopRegionPos = LoopFromHere_GetIndexEdgeCenter(hoveredIndex, rightEdge: false);
+        TextureRenderer.Render(LoopRegionTextures.LoopRegionLeft, Color.White.WithAlpha(0.5f), loopRegionPos - LoopRegionTextures.LoopRegionLeft.GetHalfSize());
     }
 
     #endregion
 
     #region Utils
+
+    internal static bool LoopFromHere_TryGetProgramInfo(InstructionsWRef instructions, out int startIndex, out int endIndex, out bool hasHalt) {
+        startIndex = endIndex = -1;
+        hasHalt = false;
+        if (instructions.program.Count <= 0)
+            return false;
+
+        startIndex = instructions.program.Keys.Min();
+        endIndex = instructions.program.Keys.Max();
+        endIndex += instructions.program[endIndex].expansion.Length - 1;
+        hasHalt = instructions.program.Values.Any(i => i.instruction.category == InstructionCategory.Halt);
+        return true;
+    }
+
+    internal static Dictionary<Part, int> LoopFromHere_GetProgramEndIndicesFromProgramGrid(CompiledProgramGrid programGrid) {
+        Dictionary<Part, int> programEndIndices = new();
+        foreach ((Part part, CompiledProgram program) in ((patch_CompiledProgramGrid) (object) programGrid).programDict) {
+            if (program.instructions.Length <= 0)
+                continue;
+
+            programEndIndices[part] = program.startIndex + program.instructions.Length - 1;
+        }
+
+        return programEndIndices;
+    }
+    internal static Dictionary<Part, int> LoopFromHere_GetProgramEndIndicesFromInstructions(Dictionary<Part, InstructionsWRef> instructions) {
+        Dictionary<Part, int> programEndIndices = new();
+        foreach ((Part part, InstructionsWRef partInstructions) in instructions) {
+            if (LoopFromHere_TryGetProgramInfo(partInstructions, out int _, out int programEndIndex, out bool _))
+                programEndIndices[part] = programEndIndex;
+        }
+
+        return programEndIndices;
+    }
 
     internal Maybe<Index2> LoopFromHere_GetIndexAt(Vector2 screenPos) {
         List<Part> parts = solEditScrn.GetSolution().GetOrderedProgrammables();
@@ -182,11 +281,15 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
 
         return MaybeHelper.empty;
     }
-
     internal Vector2 LoopFromHere_GetIndexEdgeCenter(Index2 index, bool rightEdge = false) {
         Vector2 relativePosition = GetScreenPosition(index) - programAreaOffset;
         return relativePosition + new Vector2(rightEdge ? instructionSize.X : 0f, instructionSize.Y / 2f);
     }
+
+    internal static bool LoopFromHere_CanPlaceLoopRegion(Index2 index, InstructionsWRef instructions)
+        => LoopFromHere_TryGetProgramInfo(instructions, out int _, out int programEndIndex, out bool hasHalt)
+            && !hasHalt
+            && index.X <= programEndIndex;
 
     #endregion
 }

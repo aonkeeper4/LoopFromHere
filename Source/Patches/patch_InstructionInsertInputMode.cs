@@ -5,9 +5,13 @@ using Mono.Cecil;
 using MonoMod;
 using MonoMod.Cil;
 using MonoMod.InlineRT;
+using MonoMod.Utils;
 
 // todo:
-// while holding the edit loop regions keybind, make editing a program affect its loop region (including making it show in the held instructions if necessary)
+// make editing a program affect its loop region
+// * only edits made while holding the edit loop regions keybind can affect the start of a loop region
+// * all edits can affect the end of a loop region
+// * if an edit will affect a loop region, make it render appropriately
 // make adding a halt instruction to a program delete its loop region
 // make removing all instructions from a program delete its loop region
 // make removing all instructions to the right of a loop region delete it
@@ -18,7 +22,7 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
     public static void Patch_StartInputMode(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `InstructionInsertInputMode.StartInputMode(SolutionEditorScreen solEditScrn, Vector2 startMousePos)` to remove period override instruction limit...");
 
-        MethodDefinition m_InstructionInsertInputMode_UncapPeriodOverrideLimit = method.DeclaringType.Methods.First(m => m.Name == "LoopFromHere_RemovePeriodOverrideLimit");
+        MethodDefinition m_InstructionInsertInputMode_RemovePeriodOverrideLimit = method.DeclaringType.FindMethod("LoopFromHere_RemovePeriodOverrideLimit");
 
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
@@ -37,7 +41,7 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
                 throw new Exception("Failed to patch `InstructionInsertInputMode.StartInputMode(SolutionEditorScreen solEditScrn, Vector2 startMousePos)`: Unable to find period override instruction detection to patch.");
 
             cursor.EmitLdarg0();
-            cursor.EmitCall(m_InstructionInsertInputMode_UncapPeriodOverrideLimit);
+            cursor.EmitCall(m_InstructionInsertInputMode_RemovePeriodOverrideLimit);
         });
     }
 
