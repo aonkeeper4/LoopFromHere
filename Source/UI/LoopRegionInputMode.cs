@@ -20,19 +20,19 @@ internal class LoopRegionInputMode : IInputMode {
             Part hoveredPart = solEditScrn.GetSolution().GetOrderedProgrammables()[hoveredIndex.Y];
             InstructionsWRef hoveredInstructions = hoveredPart.program.GetReferenceForPart(hoveredPart, solEditScrn.GetSolution().GetTrackUnderPart(hoveredPart));
 
-            if (leftClickPressed && patch_SolutionEditorProgramPanel.LoopFromHere_CanPlaceLoopRegion(hoveredIndex, hoveredInstructions)) {
+            if (leftClickPressed && patch_SolutionEditorProgramPanel.LoopFromHere_CanPlaceLoopRegion(hoveredInstructions, hoveredIndex.X)) {
                 // place loop region
                 if (hoveredPart.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
-                    ((LoopRegionComponent) component).LoopStartCycle = hoveredIndex.X;
+                    ((LoopRegionComponent) component).LoopStartIndex = hoveredIndex.X;
                 else
-                    hoveredPart.AddComponent(new LoopRegionComponent { LoopStartCycle = hoveredIndex.X });
+                    hoveredPart.AddComponent(new LoopRegionComponent { LoopStartIndex = hoveredIndex.X });
                 Assets.sounds.instruction_place.PlaySound(1f);
 
                 leftClickPressed = false;
                 editMade = true;
             } else if (rightClickPressed
                 && hoveredPart.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)
-                && ((LoopRegionComponent) component).LoopStartCycle == hoveredIndex.X) {
+                && ((LoopRegionComponent) component).LoopStartIndex == hoveredIndex.X) {
                 // remove loop region
                 hoveredPart.RemoveComponent(LoopRegionComponent.Id);
                 Assets.sounds.instruction_remove.PlaySound(1f);

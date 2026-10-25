@@ -4,6 +4,7 @@ using Mono.Cecil;
 using MonoMod;
 using MonoMod.Cil;
 using MonoMod.InlineRT;
+using MonoMod.Utils;
 
 public class patch_PanningInputMode : PanningInputMode {
     private IInputMode LoopFromHere_previousInputMode;
@@ -17,8 +18,8 @@ public class patch_PanningInputMode : PanningInputMode {
     public static void Patch_ctor(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `PanningInputMode..ctor` to remember previous input mode...");
 
-        FieldDefinition f_SolutionEditorScreen_currentInputMode = MonoModRule.Modder.FindType("SolutionEditorScreen").Resolve().Fields.First(f => f.Name == "currentInputMode");
-        FieldDefinition f_PanningInputMode_previousInputMode = method.DeclaringType.Fields.First(f => f.Name == "LoopFromHere_previousInputMode");
+        FieldDefinition f_SolutionEditorScreen_currentInputMode = MonoModRule.Modder.FindType("SolutionEditorScreen").Resolve().FindField("currentInputMode");
+        FieldDefinition f_PanningInputMode_previousInputMode = method.DeclaringType.FindField("LoopFromHere_previousInputMode");
 
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
@@ -37,7 +38,7 @@ public class patch_PanningInputMode : PanningInputMode {
     public static void Patch_Process(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `PanningInputMode.Process` to remember previous input mode...");
 
-        FieldDefinition f_PanningInputMode_previousInputMode = method.DeclaringType.Fields.First(f => f.Name == "LoopFromHere_previousInputMode");
+        FieldDefinition f_PanningInputMode_previousInputMode = method.DeclaringType.FindField("LoopFromHere_previousInputMode");
 
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);

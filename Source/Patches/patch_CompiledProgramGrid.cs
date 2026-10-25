@@ -49,13 +49,15 @@ public class patch_CompiledProgramGrid {
         if (!part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
             return orig;
 
-        int loopStartCycle = ((LoopRegionComponent) component).LoopStartCycle, loopStartIndex = loopStartCycle - program.startIndex;
+        LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
+        int loopStartIndex = loopRegionComponent.LoopStartIndex - program.startIndex,
+            loopEndIndex = loopRegionComponent.LoopEndIndex - program.startIndex;
 
-        int cyclesSinceStart = cycle - program.startIndex, cyclesSinceLooping = cycle - loopStartCycle;
+        int cyclesSinceStart = cycle - program.startIndex, cyclesSinceLooping = cycle - loopRegionComponent.LoopStartIndex;
         if (cyclesSinceLooping < 0)
             return cyclesSinceStart;
 
-        int period = program.instructions.Length - loopStartIndex;
+        int period = loopEndIndex - loopStartIndex + 1;
         int positionInLoop = cyclesSinceLooping % period;
         return positionInLoop + loopStartIndex;
     }
@@ -90,19 +92,24 @@ public class patch_CompiledProgramGrid {
         if (programGrid.programDict.Keys.All(p => !p.HasComponent(LoopRegionComponent.Id)))
             return orig;
 
-        int defaultPeriod = 1, loopRegionPeriod = 1;
+        int totalPeriod = 1;
         foreach ((Part part, CompiledProgram program) in programGrid.programDict) {
             if (program.isOutOfCycle || program.instructions.Length <= 0)
                 continue;
 
+            int period;
             if (part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)) {
-                int period = program.instructions.Length - (((LoopRegionComponent) component).LoopStartCycle - program.startIndex);
-                loopRegionPeriod = MathHelper.Lcm(loopRegionPeriod, period);
+                LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
+                int loopStartIndex = loopRegionComponent.LoopStartIndex - program.startIndex,
+                    loopEndIndex = loopRegionComponent.LoopEndIndex - program.startIndex;
+                period = loopEndIndex - loopStartIndex + 1;
             } else
-                defaultPeriod = program.instructions.Length;
+                period = program.instructions.Length;
+
+            totalPeriod = MathHelper.Lcm(totalPeriod, period);
         }
 
-        return MathHelper.Lcm(defaultPeriod, loopRegionPeriod);
+        return totalPeriod;
     }
 
     [MonoModILInject("FromSolution")]
@@ -164,7 +171,7 @@ public class patch_CompiledProgramGrid {
     private static bool LoopFromHere_UseCustomCompilation(Solution solution)
         => solution.parts.Any(p => p.HasComponent(LoopRegionComponent.Id));
     private static Dictionary<Part, CompiledProgram> LoopFromHere_CompileProgramGrid(Dictionary<Part, SortedDictionary<int, CompiledInstruction>> partInstructions) {
-        int defaultPeriod = 0;
+        int defaultTapeLength = 0;
         foreach ((Part part, SortedDictionary<int, CompiledInstruction> instructions) in partInstructions) {
             if (part.HasComponent(LoopRegionComponent.Id)
                 || instructions.Count <= 0
@@ -172,24 +179,24 @@ public class patch_CompiledProgramGrid {
                 continue;
 
             int period = instructions.Keys.Max() - instructions.Keys.Min() + 1;
-            defaultPeriod = Math.Max(defaultPeriod, period);
+            defaultTapeLength = Math.Max(defaultTapeLength, period);
         }
 
         Dictionary<Part, CompiledProgram> compiledProgramGrid = new();
         foreach ((Part part, SortedDictionary<int, CompiledInstruction> instructions) in partInstructions) {
             int startIndex = instructions.Keys.MinOrDefault(0), endIndex = instructions.Keys.MaxOrDefault(0);
             bool hasLoopFromHere = part.HasComponent(LoopRegionComponent.Id), hasHalt = instructions.Values.Any(i => i.type.category == InstructionCategory.Halt);
-            int period = hasLoopFromHere || hasHalt
+            int tapeLength = hasLoopFromHere || hasHalt
                 ? endIndex - startIndex + 1 // in vanilla, halt arms have their instruction tape padded to be at least the period of the other arms. i think it's ok to not do that here
-                : defaultPeriod;
+                : defaultTapeLength;
 
             CompiledProgram partProgram = new() {
                 startIndex = startIndex,
-                instructions = new CompiledInstruction[period],
+                instructions = new CompiledInstruction[tapeLength],
                 isOutOfCycle = hasHalt
             };
             bool isExpansion = false;
-            for (int i = 0; i < period; i++)
+            for (int i = 0; i < tapeLength; i++)
             {
                 Maybe<CompiledInstruction> instruction = instructions.GetOrNone(startIndex + i);
 

@@ -12,11 +12,8 @@ using MonoMod.Utils;
 // * only edits made while holding the edit loop regions keybind can affect the start of a loop region
 // * all edits can affect the end of a loop region
 // * if an edit will affect a loop region, make it render appropriately
-// make adding a halt instruction to a program delete its loop region
-// make removing all instructions from a program delete its loop region
-// make removing all instructions to the right of a loop region delete it
 //
-// loop regions are solid on the left, sticky on the right
+// the start of a loop region is solid on the left and sticky on the right
 public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
     [MonoModILInject("IInputMode InstructionInsertInputMode::StartInputMode(SolutionEditorScreen,Vector2)")]
     public static void Patch_StartInputMode(MethodDefinition method, CustomAttribute attribute) {
