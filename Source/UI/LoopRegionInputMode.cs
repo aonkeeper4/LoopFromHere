@@ -1,11 +1,17 @@
 using System.Linq;
 using LoopFromHere.Components;
+using LoopFromHere.Helpers;
 using Quintessential.Components;
 using SDL2;
 
 namespace LoopFromHere.UI;
 
 internal class LoopRegionInputMode : IInputMode {
+    public static IInputMode StartInputMode(SolutionEditorScreen solEditScrn) {
+        solEditScrn.ClearInstrSelection();
+        return new LoopRegionInputMode();
+    }
+
     public Maybe<IInputMode> Process(SolutionEditorScreen solEditScrn) {
         if (!EditingLoopRegions())
             return new NormalInputMode();
@@ -20,7 +26,7 @@ internal class LoopRegionInputMode : IInputMode {
             Part hoveredPart = solEditScrn.GetSolution().GetOrderedProgrammables()[hoveredIndex.Y];
             InstructionsWRef hoveredInstructions = hoveredPart.program.GetReferenceForPart(hoveredPart, solEditScrn.GetSolution().GetTrackUnderPart(hoveredPart));
 
-            if (leftClickPressed && patch_SolutionEditorProgramPanel.LoopFromHere_CanPlaceLoopRegion(hoveredInstructions, hoveredIndex.X)) {
+            if (leftClickPressed && CanPlaceLoopRegion(hoveredInstructions, hoveredIndex.X)) {
                 // place loop region
                 if (hoveredPart.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
                     ((LoopRegionComponent) component).LoopStartIndex = hoveredIndex.X;
@@ -53,12 +59,12 @@ internal class LoopRegionInputMode : IInputMode {
 
     public void RenderOverlay(SolutionEditorScreen solEditScrn) { }
 
-    public static IInputMode StartInputMode(SolutionEditorScreen solEditScrn) {
-        solEditScrn.ClearInstrSelection();
-        return new LoopRegionInputMode();
-    }
-
     // no idea why i have to use `WhileKeyHeld`
     public static bool EditingLoopRegions()
         => InputManager.WhileKeyHeld(SDL.SDL_GetKeyFromName(LoopFromHereSettings.Instance.EditLoopRegions.Key));
+
+    public static bool CanPlaceLoopRegion(InstructionsWRef instructions, int index) {
+        ProgramHelper.ProgramInfo info = new(instructions);
+        return !info.IsEmpty && !info.HasHalt && index <= info.EndIndex;
+    }
 }

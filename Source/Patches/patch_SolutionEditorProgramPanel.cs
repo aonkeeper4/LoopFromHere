@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using LoopFromHere.Components;
+using LoopFromHere.Helpers;
 using LoopFromHere.UI;
 using Mono.Cecil;
 using MonoMod;
@@ -164,36 +165,37 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
     private static bool LoopFromHere_UseCustomPeriodRendering(PanelWParts panel)
         => panel.parts.Any(p => p.HasComponent(LoopRegionComponent.Id));
     private void LoopFromHere_RenderPeriodHighlights(float deltaTime, PanelWParts panelWParts, int partsStartIndex, int partsEndIndex, Dictionary<Part, InstructionsWRef> partInstructions) {
-        int defaultPeriod = 0;
-        Dictionary<Part, (bool, int, int, bool, Maybe<LoopRegionComponent>)> programInfo = new();
+        int defaultPeriod = 1;
+        Dictionary<Part, (ProgramHelper.ProgramInfo, Maybe<LoopRegionComponent>)> programInfo = new();
         foreach ((Part part, InstructionsWRef instructions) in partInstructions) {
-            (bool isEmpty, int programStartIndex, int programEndIndex, bool hasHalt) = LoopFromHere_GetProgramInfo(instructions);
+            ProgramHelper.ProgramInfo info = new(instructions);
 
             Maybe<LoopRegionComponent> loopRegionComponent = MaybeHelper.empty;
             if (part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
                 loopRegionComponent = (LoopRegionComponent) component;
-            programInfo.Add(part, (isEmpty, programStartIndex, programEndIndex, hasHalt, loopRegionComponent));
+            programInfo.Add(part, (info, loopRegionComponent));
 
-            if (!hasHalt && !loopRegionComponent.HasValue()) {
-                int period = programEndIndex - programStartIndex + 1;
-                defaultPeriod = Math.Max(defaultPeriod, period);
-            }
+            if (info.HasHalt || loopRegionComponent.HasValue())
+                continue;
+
+            int period = info.EndIndex - info.StartIndex + 1;
+            defaultPeriod = Math.Max(defaultPeriod, period);
         }
 
         for (int i = partsStartIndex; i < partsEndIndex; i++)
         {
             Part part = panelWParts.parts[i];
-            (bool isEmpty, int programStartIndex, int programEndIndex, bool hasHalt, Maybe<LoopRegionComponent> loopRegionComponent) = programInfo[part];
+            (ProgramHelper.ProgramInfo info, Maybe<LoopRegionComponent> loopRegionComponent) = programInfo[part];
 
             if (loopRegionComponent.GetOrDefault(out LoopRegionComponent component)) {
                 LoopFromHere_RenderHighlight(i, component.LoopStartIndex, component.LoopEndIndex, Color.FromHex(0xf2c76d));
-                if (!isEmpty && component.LoopStartIndex > programStartIndex)
-                    LoopFromHere_RenderHighlight(i, programStartIndex, component.LoopStartIndex - 1, Color.White);
-            } else if (!isEmpty) {
-                if (hasHalt)
-                    LoopFromHere_RenderHighlight(i, programStartIndex, programEndIndex, Color.White);
+                if (component.LoopStartIndex > info.StartIndex)
+                    LoopFromHere_RenderHighlight(i, info.StartIndex, component.LoopStartIndex - 1, Color.White);
+            } else if (!info.IsEmpty) {
+                if (info.HasHalt)
+                    LoopFromHere_RenderHighlight(i, info.StartIndex, info.EndIndex, Color.White);
                 else
-                    LoopFromHere_RenderHighlight(i, programStartIndex, programStartIndex + defaultPeriod - 1, Color.White);
+                    LoopFromHere_RenderHighlight(i, info.StartIndex, info.StartIndex + defaultPeriod - 1, Color.White);
             }
         }
     }
@@ -212,7 +214,7 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
             return;
 
         InstructionsWRef hoveredInstructions = partInstructions[panelWParts.parts[hoveredIndex.Y]];
-        if (!LoopFromHere_CanPlaceLoopRegion(hoveredInstructions, hoveredIndex.X))
+        if (!LoopRegionInputMode.CanPlaceLoopRegion(hoveredInstructions, hoveredIndex.X))
             return;
 
         Vector2 loopRegionPos = LoopFromHere_GetIndexEdgeCenter(hoveredIndex, rightEdge: false);
@@ -222,17 +224,6 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
     #endregion
 
     #region Utils
-
-    internal static (bool, int, int, bool) LoopFromHere_GetProgramInfo(InstructionsWRef instructions) {
-        if (instructions.program.Count <= 0)
-            return (true, -1, -1, false);
-
-        int startIndex = instructions.program.Keys.Min();
-        int endIndex = instructions.program.Keys.Max();
-        endIndex += instructions.program[endIndex].expansion.Length - 1;
-        bool hasHalt = instructions.program.Values.Any(i => i.instruction.category == InstructionCategory.Halt);
-        return (false, startIndex, endIndex, hasHalt);
-    }
 
     internal Maybe<Index2> LoopFromHere_GetIndexAt(Vector2 screenPos) {
         List<Part> parts = solEditScrn.GetSolution().GetOrderedProgrammables();
@@ -249,11 +240,6 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
     internal Vector2 LoopFromHere_GetIndexEdgeCenter(Index2 index, bool rightEdge = false) {
         Vector2 relativePosition = GetScreenPosition(index) - programAreaOffset;
         return relativePosition + new Vector2(rightEdge ? instructionSize.X : 0f, instructionSize.Y / 2f);
-    }
-
-    internal static bool LoopFromHere_CanPlaceLoopRegion(InstructionsWRef instructions, int index) {
-        (bool isEmpty, _, int programEndIndex, bool hasHalt) = LoopFromHere_GetProgramInfo(instructions);
-        return !isEmpty && !hasHalt && index <= programEndIndex;
     }
 
     #endregion

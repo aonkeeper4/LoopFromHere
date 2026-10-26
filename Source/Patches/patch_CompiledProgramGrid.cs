@@ -13,14 +13,13 @@ using Quintessential.Components;
 // can't inherit from `CompiledProgramGrid` bc the base ctor is private :(
 public class patch_CompiledProgramGrid {
     [MonoModIgnore]
-    [MonoModPublic] // used in `SolutionEditorProgramPanel.LoopFromHere_GetProgramEndIndicesFromProgramGrid`
-    public readonly Dictionary<Part, CompiledProgram> programDict;
+    private readonly Dictionary<Part, CompiledProgram> programDict;
 
     [MonoModILInject("GetInstructionForPart")]
     public static void Patch_GetInstructionForPart(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `CompiledProgramGrid.GetInstructionForPart` to add support for custom looping behaviour...");
 
-        MethodDefinition m_CompiledProgramGrid_ModifyInstructionIndex = method.DeclaringType.FindMethod("LoopFromHere_ModifyInstructionIndex");
+        MethodDefinition m_CompiledProgramGrid_ModifyInstructionIndex = method.DeclaringType.FindMethod("LoopFromHere_ModifyInstructionIndex")!;
 
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
@@ -66,7 +65,7 @@ public class patch_CompiledProgramGrid {
     public static void Patch_GetLoopedCycle(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `CompiledProgramGrid.GetLoopedCycle` to add support for custom looping behaviour...");
 
-        MethodDefinition m_CompiledProgramGrid_ModifyTotalPeriod = method.DeclaringType.FindMethod("LoopFromHere_ModifyTotalPeriod");
+        MethodDefinition m_CompiledProgramGrid_ModifyTotalPeriod = method.DeclaringType.FindMethod("LoopFromHere_ModifyTotalPeriod")!;
 
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
@@ -116,8 +115,8 @@ public class patch_CompiledProgramGrid {
     public static void Patch_FromSolution(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `CompiledProgramGrid.FromSolution` to add support for custom looping behaviour...");
 
-        MethodDefinition m_CompiledProgramGrid_UseCustomCompilation = method.DeclaringType.FindMethod("LoopFromHere_UseCustomCompilation");
-        MethodDefinition m_CompiledProgramGrid_CompileProgramGrid = method.DeclaringType.FindMethod("LoopFromHere_CompileProgramGrid");
+        MethodDefinition m_CompiledProgramGrid_UseCustomCompilation = method.DeclaringType.FindMethod("LoopFromHere_UseCustomCompilation")!;
+        MethodDefinition m_CompiledProgramGrid_CompileProgramGrid = method.DeclaringType.FindMethod("LoopFromHere_CompileProgramGrid")!;
 
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
@@ -171,34 +170,37 @@ public class patch_CompiledProgramGrid {
     private static bool LoopFromHere_UseCustomCompilation(Solution solution)
         => solution.parts.Any(p => p.HasComponent(LoopRegionComponent.Id));
     private static Dictionary<Part, CompiledProgram> LoopFromHere_CompileProgramGrid(Dictionary<Part, SortedDictionary<int, CompiledInstruction>> partInstructions) {
-        int defaultTapeLength = 0;
+        int defaultTapeLength = 1;
+        Dictionary<Part, (ProgramHelper.ProgramInfo, bool)> programInfo = new();
         foreach ((Part part, SortedDictionary<int, CompiledInstruction> instructions) in partInstructions) {
-            if (part.HasComponent(LoopRegionComponent.Id)
-                || instructions.Count <= 0
-                || instructions.Values.Any(i => i.type.category == InstructionCategory.Halt))
+            ProgramHelper.ProgramInfo info = new(instructions);
+            bool hasLoopRegion = part.HasComponent(LoopRegionComponent.Id);
+            programInfo.Add(part, (info, hasLoopRegion));
+
+            if (info.IsEmpty || info.HasHalt || hasLoopRegion)
                 continue;
 
-            int period = instructions.Keys.Max() - instructions.Keys.Min() + 1;
+            int period = info.EndIndex - info.StartIndex + 1;
             defaultTapeLength = Math.Max(defaultTapeLength, period);
         }
 
         Dictionary<Part, CompiledProgram> compiledProgramGrid = new();
         foreach ((Part part, SortedDictionary<int, CompiledInstruction> instructions) in partInstructions) {
-            int startIndex = instructions.Keys.MinOrDefault(0), endIndex = instructions.Keys.MaxOrDefault(0);
-            bool hasLoopFromHere = part.HasComponent(LoopRegionComponent.Id), hasHalt = instructions.Values.Any(i => i.type.category == InstructionCategory.Halt);
-            int tapeLength = hasLoopFromHere || hasHalt
-                ? endIndex - startIndex + 1 // in vanilla, halt arms have their instruction tape padded to be at least the period of the other arms. i think it's ok to not do that here
+            (ProgramHelper.ProgramInfo info, bool hasLoopRegion) = programInfo[part];
+            int tapeLength = info.HasHalt || hasLoopRegion
+                ? info.EndIndex - info.StartIndex + 1 // in vanilla, halt arms have their instruction tape padded to be at least the period of the other arms. i think it's ok to not do that here
                 : defaultTapeLength;
 
             CompiledProgram partProgram = new() {
-                startIndex = startIndex,
+                startIndex = info.StartIndex,
                 instructions = new CompiledInstruction[tapeLength],
-                isOutOfCycle = hasHalt
+                isOutOfCycle = info.HasHalt
             };
+
             bool isExpansion = false;
             for (int i = 0; i < tapeLength; i++)
             {
-                Maybe<CompiledInstruction> instruction = instructions.GetOrNone(startIndex + i);
+                Maybe<CompiledInstruction> instruction = instructions.GetOrNone(info.StartIndex + i);
 
                 partProgram.instructions[i] = instruction.GetOrDefault(new CompiledInstruction {
                     type = InstructionTypes.idle,

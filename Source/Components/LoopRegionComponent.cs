@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using LoopFromHere.Helpers;
 using Quintessential;
 using Quintessential.Components;
 using Quintessential.Serialization;
@@ -48,12 +49,13 @@ internal class LoopRegionComponent : IPartComponent {
         Solution solution = solEditScrn.GetSolution();
         InstructionsWRef instructions = Part.program.GetReferenceForPart(Part, solution.GetTrackUnderPart(Part));
 
-        (bool isEmpty, _, int programEndIndex, bool hasHalt) = patch_SolutionEditorProgramPanel.LoopFromHere_GetProgramInfo(instructions);
-        if (isEmpty || LoopStartIndex > programEndIndex || hasHalt)
+        ProgramHelper.ProgramInfo info = new(instructions);
+        if (info.IsEmpty || info.HasHalt || LoopStartIndex > info.EndIndex) {
             Part.RemoveComponent(Id);
+            return;
+        }
 
-        LoopEndIndex = programEndIndex;
-        StartRenderMode = EndRenderMode = RenderMode.Normal; // hmm
+        LoopEndIndex = info.EndIndex;
     }
 
     public static void Register()

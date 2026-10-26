@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using LoopFromHere.Components;
 using Mono.Cecil;
 using MonoMod;
 using MonoMod.Cil;
@@ -13,13 +14,12 @@ public class patch_PanningInputMode : PanningInputMode {
     public patch_PanningInputMode(SolutionEditorScreen solEditScrn, SolutionEditorPanel pannedItem) : base(solEditScrn, pannedItem) { }
 
     // `orig_`-style patching for constructors doesn't work yet
-    // neither does calling patch methods `patch_Method` weh
     [MonoModILInject(".ctor")]
     public static void Patch_ctor(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `PanningInputMode..ctor` to remember previous input mode...");
 
-        FieldDefinition f_SolutionEditorScreen_currentInputMode = MonoModRule.Modder.FindType("SolutionEditorScreen").Resolve().FindField("currentInputMode");
-        FieldDefinition f_PanningInputMode_previousInputMode = method.DeclaringType.FindField("LoopFromHere_previousInputMode");
+        FieldDefinition f_SolutionEditorScreen_currentInputMode = MonoModRule.Modder.FindType("SolutionEditorScreen").Resolve().FindField("currentInputMode")!;
+        FieldDefinition f_PanningInputMode_previousInputMode = method.DeclaringType.FindField("LoopFromHere_previousInputMode")!;
 
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
@@ -38,7 +38,7 @@ public class patch_PanningInputMode : PanningInputMode {
     public static void Patch_Process(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `PanningInputMode.Process` to remember previous input mode...");
 
-        FieldDefinition f_PanningInputMode_previousInputMode = method.DeclaringType.FindField("LoopFromHere_previousInputMode");
+        FieldDefinition f_PanningInputMode_previousInputMode = method.DeclaringType.FindField("LoopFromHere_previousInputMode")!;
 
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
