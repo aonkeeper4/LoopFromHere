@@ -152,11 +152,11 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
             LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
             if (loopRegionComponent.LoopStartIndex >= panelWParts.lowerBound) {
                 Vector2 loopRegionStartPos = LoopFromHere_GetIndexEdgeCenter(new Index2(loopRegionComponent.LoopStartIndex, i), rightEdge: false);
-                TextureRenderer.Render(LoopRegionTextures.LoopRegionLeft, loopRegionStartPos - LoopRegionTextures.LoopRegionLeft.GetHalfSize());
+                TextureRenderer.Render(LoopRegionTextures.LoopRegionLeft, loopRegionComponent.StartRenderMode.ToColor(), loopRegionStartPos - LoopRegionTextures.LoopRegionLeft.GetHalfSize());
             }
             if (loopRegionComponent.LoopEndIndex <= panelWParts.upperBound) {
                 Vector2 loopRegionEndPos = LoopFromHere_GetIndexEdgeCenter(new Index2(loopRegionComponent.LoopEndIndex, i), rightEdge: true);
-                TextureRenderer.Render(LoopRegionTextures.LoopRegionRight, loopRegionEndPos - LoopRegionTextures.LoopRegionRight.GetHalfSize());
+                TextureRenderer.Render(LoopRegionTextures.LoopRegionRight, loopRegionComponent.EndRenderMode.ToColor(), loopRegionEndPos - LoopRegionTextures.LoopRegionRight.GetHalfSize());
             }
         }
     }

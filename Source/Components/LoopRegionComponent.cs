@@ -33,7 +33,6 @@ internal class LoopRegionComponent : IPartComponent {
 
         Part = self;
     }
-
     public void OnUnbind(Part self)
         => Part = null;
 
@@ -59,4 +58,16 @@ internal class LoopRegionComponent : IPartComponent {
 
     public static void Register()
         => Part.RegisterComponent(Id, Codec);
+}
+
+internal static class RenderModeExtensions {
+    extension(LoopRegionComponent.RenderMode renderMode) {
+        public Color ToColor()
+            => renderMode switch {
+                LoopRegionComponent.RenderMode.None => Color.Transparent,
+                LoopRegionComponent.RenderMode.Normal => Color.White,
+                LoopRegionComponent.RenderMode.Ghost => Color.White.WithAlpha(0.5f),
+                _ => throw new ArgumentOutOfRangeException(nameof(renderMode), renderMode, null)
+            };
+    }
 }
