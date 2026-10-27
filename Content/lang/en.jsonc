@@ -1,9 +1,10 @@
 {
   "loop_from_here": {
     "": "Loop From Here",
-    "description": "A quality-of-life mod to allow solutions to start looping from an arbitrary point on the instruction tape.",
+    "description": "A mod to allow solutions to start looping from an arbitrary point on the instruction tape.",
     "settings": {
-      "edit_loop_regions": "Edit Loop Regions"
+      "edit_loop_regions": "Edit Loop Regions",
+      "instruction_edits_affect_loop_regions": "Instruction Edits Affect Loop Regions"
     }
   }
 }
