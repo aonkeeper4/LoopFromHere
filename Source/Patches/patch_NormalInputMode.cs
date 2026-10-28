@@ -11,7 +11,7 @@ public class patch_NormalInputMode : NormalInputMode {
 
         if (solEditScrn.GetSimPlayState() == SimPlayState.Stopped
             && LoopRegionInputMode.EditingLoopRegions())
-            return MaybeHelper.Create(LoopRegionInputMode.StartInputMode(solEditScrn));
+            return new LoopRegionInputMode();
 
         return MaybeHelper.empty;
     }

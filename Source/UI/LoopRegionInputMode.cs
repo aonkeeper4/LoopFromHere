@@ -1,4 +1,3 @@
-using System.Linq;
 using LoopFromHere.Components;
 using LoopFromHere.Helpers;
 using Quintessential.Components;
@@ -7,51 +6,76 @@ using SDL2;
 namespace LoopFromHere.UI;
 
 internal class LoopRegionInputMode : IInputMode {
-    public static IInputMode StartInputMode(SolutionEditorScreen solEditScrn) {
-        solEditScrn.ClearInstrSelection();
-        return new LoopRegionInputMode();
-    }
+    private Vector2 leftClickDragStartPosition, rightClickDragStartPosition;
 
     public Maybe<IInputMode> Process(SolutionEditorScreen solEditScrn) {
         if (!EditingLoopRegions())
             return new NormalInputMode();
 
         Vector2 mousePos = InputManager.MousePos();
-        bool leftClickPressed = InputManager.IsClickPressed(MouseButtonType.LeftClick),
-            rightClickPressed = InputManager.IsClickPressed(MouseButtonType.RightClick);
+        if (InputManager.IsClickPressed(MouseButtonType.LeftClick))
+            leftClickDragStartPosition = mousePos;
+        if (InputManager.IsClickPressed(MouseButtonType.RightClick))
+            rightClickDragStartPosition = mousePos;
 
+        bool interpretedLeftClick = InputManager.IsClickReleased(MouseButtonType.LeftClick) && Vector2.Distance(leftClickDragStartPosition, mousePos) < Editor.inputModeSwitchDistance,
+            interpretedRightClick = InputManager.IsClickReleased(MouseButtonType.RightClick) && Vector2.Distance(rightClickDragStartPosition, mousePos) < Editor.inputModeSwitchDistance;
+        bool leftClickDragging = InputManager.IsClickHeld(MouseButtonType.LeftClick) && Vector2.Distance(leftClickDragStartPosition, mousePos) >= Editor.inputModeSwitchDistance,
+            rightClickDragging = InputManager.IsClickHeld(MouseButtonType.RightClick) && Vector2.Distance(rightClickDragStartPosition, mousePos) >= Editor.inputModeSwitchDistance;
+
+        // handle placing/deleting loop regions
         patch_SolutionEditorProgramPanel programPanel = (patch_SolutionEditorProgramPanel) solEditScrn.programPanel;
         bool editMade = false;
         if (programPanel.LoopFromHere_GetIndexAt(mousePos).GetOrDefault(out Index2 hoveredIndex)) {
             Part hoveredPart = solEditScrn.GetSolution().GetOrderedProgrammables()[hoveredIndex.Y];
             InstructionsWRef hoveredInstructions = hoveredPart.program.GetReferenceForPart(hoveredPart, solEditScrn.GetSolution().GetTrackUnderPart(hoveredPart));
 
-            if (leftClickPressed && CanPlaceLoopRegion(hoveredInstructions, hoveredIndex.X)) {
+            if (interpretedLeftClick && CanPlaceLoopRegion(hoveredInstructions, hoveredIndex.X)) {
                 // place loop region
-                if (hoveredPart.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
-                    ((LoopRegionComponent) component).LoopStartIndex = hoveredIndex.X;
+                LoopRegionComponent loopRegionComponent;
+                if (hoveredPart.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)) {
+                    loopRegionComponent = (LoopRegionComponent) component;
+                    loopRegionComponent.LoopStartIndex = hoveredIndex.X;
+                }
                 else
-                    hoveredPart.AddComponent(new LoopRegionComponent { LoopStartIndex = hoveredIndex.X });
+                    hoveredPart.AddComponent(loopRegionComponent = new LoopRegionComponent { LoopStartIndex = hoveredIndex.X });
+
+                loopRegionComponent.Recalculate(solEditScrn);
                 Assets.sounds.instruction_place.PlaySound(1f);
 
-                leftClickPressed = false;
                 editMade = true;
-            } else if (rightClickPressed
+            } else if (interpretedRightClick
                 && hoveredPart.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)
                 && ((LoopRegionComponent) component).LoopStartIndex == hoveredIndex.X) {
-                // remove loop region
+                // delete loop region
                 hoveredPart.RemoveComponent(LoopRegionComponent.Id);
                 Assets.sounds.instruction_remove.PlaySound(1f);
 
-                rightClickPressed = false;
                 editMade = true;
             }
         }
         if (editMade)
             solEditScrn.MarkNeedsNewSnapshot();
 
-        if (rightClickPressed && solEditScrn.programPanel.ProgramScrollAreaBounds().Contains(InputManager.MousePos()))
-            return new PanningInputMode(solEditScrn, solEditScrn.programPanel);
+        // handle instruction selection
+        if (solEditScrn.programPanel.ProgramScrollAreaBounds().Contains(mousePos)) {
+            if (leftClickDragging) {
+                solEditScrn.programPanel.ClearPartSelection();
+
+                if (!solEditScrn.programPanel.GetInstructionAtPos(leftClickDragStartPosition).GetOrDefault(out InstructionReference draggedInstruction)
+                    || !solEditScrn.instructionSelection.HasMatching(draggedInstruction)
+                    || draggedInstruction.part.GetIsFixed())
+                    // start selecting instructions
+                    return MaybeHelper.Create(AreaSelectInstructionsInputMode.StartInputMode(solEditScrn));
+
+                // drag selected instructions
+                Assets.sounds.instruction_pickup.PlaySound(1f);
+                return MaybeHelper.Create(InstructionInsertInputMode.StartInputMode(solEditScrn, leftClickDragStartPosition));
+            }
+            if (rightClickDragging)
+                // start panning
+                return new PanningInputMode(solEditScrn, solEditScrn.programPanel);
+        }
 
         return MaybeHelper.empty;
     }
@@ -61,7 +85,8 @@ internal class LoopRegionInputMode : IInputMode {
 
     // no idea why i have to use `WhileKeyHeld`
     public static bool EditingLoopRegions()
-        => InputManager.WhileKeyHeld(SDL.SDL_GetKeyFromName(LoopFromHereSettings.Instance.EditLoopRegions.Key));
+        => InputManager.WhileKeyHeld(SDL.SDL_GetKeyFromName(LoopFromHereSettings.Instance.EditLoopRegions.Key))
+            && !SolutionEditorProgramPanel.IsFastForwardHeld();
 
     public static bool CanPlaceLoopRegion(InstructionsWRef instructions, int index) {
         ProgramHelper.ProgramInfo info = new(instructions);

@@ -5,10 +5,10 @@ using Quintessential.Components;
 
 public class patch_SolutionRecorderScreen : SolutionRecorderScreen {
     [MonoModIgnore]
-    private SimpleSolutionEditor solutionEditor;
+    public patch_SolutionRecorderScreen(Solution solution) : base(solution) { }
 
     [MonoModIgnore]
-    public patch_SolutionRecorderScreen(Solution solution) : base(solution) { }
+    private SimpleSolutionEditor solutionEditor;
 
     [MonoModIgnore]
     private extern bool orig_WaitingForAnyPartToHalt();
