@@ -94,7 +94,7 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
                 continue;
 
             LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
-            if (AffectingLoopRegions() && instruction.instructionIndex == loopRegionComponent.StartIndex
+            if (LoopFromHere_AffectingLoopRegions() && instruction.instructionIndex == loopRegionComponent.StartIndex
                 || instruction.instructionIndex == loopRegionComponent.EndIndex)
                 editedLoopRegions.Add(loopRegionComponent);
         }
@@ -186,7 +186,7 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
                 continue;
             }
 
-            if (AffectingLoopRegions()
+            if (LoopFromHere_AffectingLoopRegions()
                 && heldInstruction.field_1914.GetOrDefault(out InstructionReference originalPosition)
                 && originalPosition.part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)) {
                 LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
@@ -225,7 +225,7 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
     }
 
     private void LoopFromHere_RepositionLoopRegions(Dictionary<LoopRegionComponent, int> newLoopRegionStartIndices, Dictionary<InstructionReference, InstructionType> insertedInstructions, bool inserting) {
-        if (!AffectingLoopRegions())
+        if (!LoopFromHere_AffectingLoopRegions())
             return;
 
         foreach ((LoopRegionComponent component, int newLoopRegionStartIndex) in newLoopRegionStartIndices)
@@ -323,6 +323,6 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
         }
     }
 
-    internal static bool AffectingLoopRegions()
-        => LoopRegionInputMode.EditingLoopRegions() ^ LoopFromHereSettings.Instance.InstructionEditsAffectLoopRegions;
+    internal static bool LoopFromHere_AffectingLoopRegions()
+        => LoopRegionInputMode.EditingLoopRegions() ^ LoopFromHereSettings.Instance.InstructionEditsAffectLoopRegionsByDefault;
 }

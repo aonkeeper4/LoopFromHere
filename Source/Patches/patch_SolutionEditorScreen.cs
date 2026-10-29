@@ -11,9 +11,6 @@ public class patch_SolutionEditorScreen : SolutionEditorScreen {
     [MonoModIgnore]
     public patch_SolutionEditorScreen(Solution solution, MusicTrack musicTrack, Sound fanfare) : base(solution, musicTrack, fanfare) { }
 
-    [MonoModIgnore]
-    private bool needsNewSnapshot;
-
     [MonoModILInject("RenderFrame")]
     public static void Patch_RenderFrame(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `SolutionEditorScreen.RenderFrame` to update loop regions...");

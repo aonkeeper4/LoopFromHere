@@ -16,17 +16,6 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
     public patch_SolutionEditorProgramPanel(SolutionEditorScreen solEditScrn) : base(solEditScrn) { }
 
     [MonoModIgnore]
-    private Vector2 programOffset;
-
-    [MonoModIgnore]
-    private static readonly Vector2 programAreaOffset;
-    [MonoModIgnore]
-    private static readonly int programAreaHeight;
-
-    [MonoModIgnore]
-    private extern Vector2 GetScreenPosition(Index2 instructionPos);
-
-    [MonoModIgnore]
     private extern bool orig_IsLimitReached(InstructionType instructionType);
     private bool IsLimitReached(InstructionType instructionType) {
         if (solEditScrn.GetSolution().parts.All(p => !p.HasComponent(LoopRegionComponent.Id)))
