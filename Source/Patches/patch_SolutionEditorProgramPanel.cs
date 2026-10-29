@@ -72,7 +72,6 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
                 throw new Exception("Failed to patch `SolutionEditorProgramPanel.RenderFrame`: Unable to find instruction highlight rendering to patch.");
 
             cursor.EmitLdarg0();
-            cursor.EmitLdarg1();
             cursor.EmitLdloc0();
             cursor.EmitLdloc(5);
             cursor.EmitLdloc(6);
@@ -94,7 +93,6 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
             cursor.EmitBrfalse(renderPeriodHighlights);
 
             cursor.EmitLdarg0();
-            cursor.EmitLdarg1();
             cursor.EmitLdloc0();
             cursor.EmitLdloc(5);
             cursor.EmitLdloc(6);
@@ -135,7 +133,6 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
                 throw new Exception("Failed to patch `SolutionEditorProgramPanel.RenderFrame`: Unable to find call to `TextureRenderer.Render` to patch.");
 
             cursor.EmitLdarg0();
-            cursor.EmitLdarg1();
             cursor.EmitLdloca(66);
             cursor.EmitCall(m_Maybe_InstructionReference_GetValue);
             cursor.EmitLdloc(85);
@@ -153,20 +150,18 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
                 throw new Exception("Failed to patch `SolutionEditorProgramPanel.RenderFrame`: Unable to find end of instruction rendering to patch.");
 
             cursor.EmitLdarg0();
-            cursor.EmitLdarg1();
             cursor.EmitLdloc0();
             cursor.EmitLdloc(5);
             cursor.EmitLdloc(6);
             cursor.EmitCallvirt(m_SolutionEditorProgramPanel_RenderLoopRegionMarkers);
 
             cursor.EmitLdarg0();
-            cursor.EmitLdarg1();
             cursor.EmitLdloc(65);
             cursor.EmitCallvirt(m_SolutionEditorProgramPanel_RenderLoopRegionPlacementIndicator);
         });
     }
 
-    private void LoopFromHere_RenderLoopRegionMarkers(float deltaTime, PanelWParts panelWParts, int partsStartIndex, int partsEndIndex) {
+    private void LoopFromHere_RenderLoopRegionMarkers(PanelWParts panelWParts, int partsStartIndex, int partsEndIndex) {
         for (int i = partsStartIndex; i < partsEndIndex; i++) {
             Part part = panelWParts.parts[i];
             if (!part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
@@ -190,7 +185,7 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
 
     private static bool LoopFromHere_UseCustomPeriodRendering(PanelWParts panel)
         => panel.parts.Any(p => p.HasComponent(LoopRegionComponent.Id));
-    private void LoopFromHere_RenderPeriodHighlights(float deltaTime, PanelWParts panelWParts, int partsStartIndex, int partsEndIndex, Dictionary<Part, InstructionsWRef> partInstructions) {
+    private void LoopFromHere_RenderPeriodHighlights(PanelWParts panelWParts, int partsStartIndex, int partsEndIndex, Dictionary<Part, InstructionsWRef> partInstructions) {
         int defaultPeriod = 1;
         Dictionary<Part, (ProgramHelper.ProgramInfo, Maybe<LoopRegionComponent>)> programInfo = new();
         foreach ((Part part, InstructionsWRef instructions) in partInstructions) {
@@ -234,7 +229,7 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
         TextureRenderer.Render9Slice(Assets.textures.solution_editor.program_panel.program_length_glow, color.WithAlpha(0.6f), highlightBounds);
     }
 
-    private void LoopFromHere_RenderGhostInstructionIndicator(float deltaTime, InstructionReference hoveredInstruction, Bounds2 ghostInstructionBounds) {
+    private void LoopFromHere_RenderGhostInstructionIndicator(InstructionReference hoveredInstruction, Bounds2 ghostInstructionBounds) {
         if (!hoveredInstruction.part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
             return;
 
@@ -247,7 +242,7 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
         TextureRenderer.Render(LoopRegionTextures.LoopRegionRight, Color.White.WithAlpha(LoopRegionComponent.GhostAlpha), loopRegionEndPos - LoopRegionTextures.LoopRegionRight.GetHalfSize());
     }
 
-    private void LoopFromHere_RenderLoopRegionPlacementIndicator(float deltaTime, Dictionary<Part, InstructionsWRef> partInstructions) {
+    private void LoopFromHere_RenderLoopRegionPlacementIndicator(Dictionary<Part, InstructionsWRef> partInstructions) {
         if (solEditScrn.currentInputMode is not LoopRegionInputMode
             || !GetInstructionAt(InputManager.MousePos()).GetOrDefault(out InstructionReference hoveredInstruction))
             return;
