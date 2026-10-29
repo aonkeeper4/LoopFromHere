@@ -40,7 +40,7 @@ internal class LoopRegionInputMode : IInputMode {
                 else
                     hoveredPart.AddComponent(loopRegionComponent = new LoopRegionComponent { LoopStartIndex = hoveredIndex.X });
 
-                loopRegionComponent.Recalculate(solEditScrn);
+                loopRegionComponent.LoopEndIndex = loopRegionComponent.RecalculateEndIndex(solEditScrn).GetValue(); // will never throw since we know the placement is valid
                 Assets.sounds.instruction_place.PlaySound(1f);
 
                 editMade = true;

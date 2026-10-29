@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using LoopFromHere.Helpers;
 using Quintessential;
 using Quintessential.Components;
@@ -17,25 +16,21 @@ internal class LoopRegionComponent : IPartComponent {
         loopFromIndex => new LoopRegionComponent { LoopStartIndex = loopFromIndex }
     );
 
-    private Part Part;
+    private Part part;
 
     public int LoopStartIndex, LoopEndIndex;
 
-    public enum RenderMode {
-        None,
-        Normal,
-        Ghost
-    }
-    public RenderMode StartRenderMode = RenderMode.Normal, EndRenderMode = RenderMode.Normal;
+    public const float NormalAlpha = 1f, GhostAlpha = 0.5f;
+    public float LoopStartAlpha = NormalAlpha, LoopEndAlpha = NormalAlpha;
 
     public void OnBind(Part self) {
         if (!self.GetType().isProgrammable)
             throw new InvalidOperationException($"{nameof(LoopRegionComponent)} can only be added to a programmable part!");
 
-        Part = self;
+        part = self;
     }
     public void OnUnbind(Part self)
-        => Part = null;
+        => part = null;
 
     // don't clone render properties
     public void OnClone(ref Part cloned, Solution solution)
@@ -45,31 +40,17 @@ internal class LoopRegionComponent : IPartComponent {
         });
     public void OnReset() { }
 
-    public void Recalculate(SolutionEditorScreen solEditScrn) {
+    public Maybe<int> RecalculateEndIndex(SolutionEditorScreen solEditScrn) {
         Solution solution = solEditScrn.GetSolution();
-        InstructionsWRef instructions = Part.program.GetReferenceForPart(Part, solution.GetTrackUnderPart(Part));
+        InstructionsWRef instructions = part.program.GetReferenceForPart(part, solution.GetTrackUnderPart(part));
 
         ProgramHelper.ProgramInfo info = new(instructions);
-        if (info.IsEmpty || info.HasHalt || LoopStartIndex > info.EndIndex) {
-            Part.RemoveComponent(Id);
-            return;
-        }
+        if (info.IsEmpty || info.HasHalt || LoopStartIndex > info.EndIndex)
+            return MaybeHelper.empty;
 
-        LoopEndIndex = info.EndIndex;
+        return info.EndIndex;
     }
 
     public static void Register()
         => Part.RegisterComponent(Id, Codec);
-}
-
-internal static class RenderModeExtensions {
-    extension(LoopRegionComponent.RenderMode renderMode) {
-        public Color ToColor()
-            => renderMode switch {
-                LoopRegionComponent.RenderMode.None => Color.Transparent,
-                LoopRegionComponent.RenderMode.Normal => Color.White,
-                LoopRegionComponent.RenderMode.Ghost => Color.White.WithAlpha(0.5f),
-                _ => throw new ArgumentOutOfRangeException(nameof(renderMode), renderMode, null)
-            };
-    }
 }

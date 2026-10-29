@@ -16,36 +16,42 @@ public class patch_SolutionEditorScreen : SolutionEditorScreen {
 
     [MonoModILInject("RenderFrame")]
     public static void Patch_RenderFrame(MethodDefinition method, CustomAttribute attribute) {
-        MonoModRule.Modder.Log("[LoopFromHere] Patching `SolutionEditorScreen.RenderFrame` to recalculate loop regions if necessary...");
+        MonoModRule.Modder.Log("[LoopFromHere] Patching `SolutionEditorScreen.RenderFrame` to update loop regions...");
 
-        MethodDefinition m_SolutionEditorScreen_RecalculateLoopRegions = method.DeclaringType.FindMethod("LoopFromHere_RecalculateLoopRegions")!;
+        MethodDefinition m_SolutionEditorScreen_UpdateLoopRegions = method.DeclaringType.FindMethod("LoopFromHere_UpdateLoopRegions")!;
 
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
 
             /*
-             * IL_0850: ldarg.0
-             * IL_0851: ldfld bool SolutionEditorScreen::needsSaving
-             * IL_0856: brfalse.s IL_086a
+             * IL_07e7: ldarg.0
+             * IL_07e8: ldfld class IInputMode SolutionEditorScreen::currentInputMode
+             * IL_07ed: ldarg.0
+             * IL_07ee: callvirt instance void IInputMode::ProcessAfterFrame(class SolutionEditorScreen)
              */
-            if (!cursor.TryGotoNext(MoveType.AfterLabel,
+            if (!cursor.TryGotoNext(MoveType.After,
                     instr => instr.MatchLdarg0(),
-                    instr => instr.MatchLdfld("SolutionEditorScreen", "needsSaving"),
-                    instr => instr.MatchBrfalse(out _)))
-                throw new Exception("Failed to patch `SolutionEditorScreen.RenderFrame`: Unable to find check for `SolutionEditorScreen.needsSaving` to patch.");
+                    instr => instr.MatchLdfld("SolutionEditorScreen", "currentInputMode"),
+                    instr => instr.MatchLdarg0(),
+                    instr => instr.MatchCallvirt("IInputMode", "ProcessAfterFrame")))
+                throw new Exception("Failed to patch `SolutionEditorScreen.RenderFrame`: Unable to find call to `IInputMode.ProcessAfterFrame` to patch.");
 
             cursor.EmitLdarg0();
-            cursor.EmitCallvirt(m_SolutionEditorScreen_RecalculateLoopRegions);
+            cursor.EmitCallvirt(m_SolutionEditorScreen_UpdateLoopRegions);
         });
     }
 
-    private void LoopFromHere_RecalculateLoopRegions() {
-        if (!needsNewSnapshot)
-            return;
-
+    private void LoopFromHere_UpdateLoopRegions() {
         foreach (Part part in GetSolution().parts) {
-            if (part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
-                ((LoopRegionComponent) component).Recalculate(this);
+            if (!part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
+                continue;
+
+            LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
+            if (loopRegionComponent.RecalculateEndIndex(this).GetOrDefault(out int newLoopEndIndex))
+                loopRegionComponent.LoopEndIndex = newLoopEndIndex;
+            else
+                part.RemoveComponent(LoopRegionComponent.Id);
+            loopRegionComponent.LoopStartAlpha = loopRegionComponent.LoopEndAlpha = LoopRegionComponent.NormalAlpha;
         }
     }
 }

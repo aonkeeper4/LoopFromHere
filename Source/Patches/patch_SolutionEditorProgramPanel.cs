@@ -46,10 +46,17 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
     public static void Patch_RenderFrame(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `SolutionEditorProgramPanel.RenderFrame` to add UI for custom looping behaviour...");
 
-        MethodDefinition m_SolutionEditorProgramPanel_RenderLoopRegionMarkers = method.DeclaringType.FindMethod("LoopFromHere_RenderLoopRegionMarkers")!;
-        MethodDefinition m_SolutionEditorProgramPanel_UseCustomPeriodRendering = method.DeclaringType.FindMethod("LoopFromHere_UseCustomPeriodRendering")!;
-        MethodDefinition m_SolutionEditorProgramPanel_RenderPeriodHighlights = method.DeclaringType.FindMethod("LoopFromHere_RenderPeriodHighlights")!;
-        MethodDefinition m_SolutionEditorProgramPanel_RenderLoopRegionPlacementIndicator = method.DeclaringType.FindMethod("LoopFromHere_RenderLoopRegionPlacementIndicator")!;
+        TypeDefinition t_SolutionEditorProgramPanel = method.DeclaringType;
+        MethodDefinition m_SolutionEditorProgramPanel_RenderLoopRegionMarkers = t_SolutionEditorProgramPanel.FindMethod("LoopFromHere_RenderLoopRegionMarkers")!;
+        MethodDefinition m_SolutionEditorProgramPanel_UseCustomPeriodRendering = t_SolutionEditorProgramPanel.FindMethod("LoopFromHere_UseCustomPeriodRendering")!;
+        MethodDefinition m_SolutionEditorProgramPanel_RenderPeriodHighlights = t_SolutionEditorProgramPanel.FindMethod("LoopFromHere_RenderPeriodHighlights")!;
+        MethodDefinition m_SolutionEditorProgramPanel_RenderGhostInstructionIndicator = t_SolutionEditorProgramPanel.FindMethod("LoopFromHere_RenderGhostInstructionIndicator")!;
+        MethodDefinition m_SolutionEditorProgramPanel_RenderLoopRegionPlacementIndicator = t_SolutionEditorProgramPanel.FindMethod("LoopFromHere_RenderLoopRegionPlacementIndicator")!;
+
+        TypeDefinition t_Maybe = MonoModRule.Modder.FindType("Maybe`1").Resolve();
+        TypeDefinition t_InstructionReference = MonoModRule.Modder.FindType("InstructionReference").Resolve();
+        GenericInstanceType t_Maybe_InstructionReference = new(t_Maybe); t_Maybe_InstructionReference.GenericArguments.Add(t_InstructionReference);
+        MethodReference m_Maybe_InstructionReference_GetValue = t_Maybe.FindMethod("GetValue")!.Clone()!; m_Maybe_InstructionReference_GetValue.DeclaringType = t_Maybe_InstructionReference;
 
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
@@ -119,6 +126,28 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
             cursor.MarkLabel(afterRenderPeriodHighlights);
 
             /*
+             * IL_0f47: ldc.r4 2
+             * IL_0f4c: ldc.r4 0.0
+             * IL_0f51: newobj instance void Vector2::.ctor(float32, float32)
+             * IL_0f56: call valuetype Vector2 Vector2::op_Addition(valuetype Vector2, valuetype Vector2)
+             * IL_0f5b: call void TextureRenderer::Render(class Texture, valuetype Color, valuetype Vector2)
+             */
+            if (!cursor.TryGotoNext(MoveType.After,
+                    instr => instr.MatchLdcR4(2f),
+                    instr => instr.MatchLdcR4(0f),
+                    instr => instr.MatchNewobj("Vector2"),
+                    instr => instr.MatchCall("Vector2", "op_Addition"),
+                    instr => instr.MatchCall("TextureRenderer", "Render")))
+                throw new Exception("Failed to patch `SolutionEditorProgramPanel.RenderFrame`: Unable to find call to `TextureRenderer.Render` to patch.");
+
+            cursor.EmitLdarg0();
+            cursor.EmitLdarg1();
+            cursor.EmitLdloca(66);
+            cursor.EmitCall(m_Maybe_InstructionReference_GetValue);
+            cursor.EmitLdloc(85);
+            cursor.EmitCallvirt(m_SolutionEditorProgramPanel_RenderGhostInstructionIndicator);
+
+            /*
              * IL_1348: ldloc.s 95
              * IL_134a: ldloc.s 6
              * IL_134c: blt IL_11aa
@@ -153,11 +182,11 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
             LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
             if (loopRegionComponent.LoopStartIndex >= panelWParts.lowerBound) {
                 Vector2 loopRegionStartPos = LoopFromHere_GetIndexEdgeCenter(new Index2(loopRegionComponent.LoopStartIndex, i), rightEdge: false);
-                TextureRenderer.Render(LoopRegionTextures.LoopRegionLeft, loopRegionComponent.StartRenderMode.ToColor(), loopRegionStartPos - LoopRegionTextures.LoopRegionLeft.GetHalfSize());
+                TextureRenderer.Render(LoopRegionTextures.LoopRegionLeft, Color.White.WithAlpha(loopRegionComponent.LoopStartAlpha), loopRegionStartPos - LoopRegionTextures.LoopRegionLeft.GetHalfSize());
             }
             if (loopRegionComponent.LoopEndIndex <= panelWParts.upperBound) {
                 Vector2 loopRegionEndPos = LoopFromHere_GetIndexEdgeCenter(new Index2(loopRegionComponent.LoopEndIndex, i), rightEdge: true);
-                TextureRenderer.Render(LoopRegionTextures.LoopRegionRight, loopRegionComponent.EndRenderMode.ToColor(), loopRegionEndPos - LoopRegionTextures.LoopRegionRight.GetHalfSize());
+                TextureRenderer.Render(LoopRegionTextures.LoopRegionRight, Color.White.WithAlpha(loopRegionComponent.LoopEndAlpha), loopRegionEndPos - LoopRegionTextures.LoopRegionRight.GetHalfSize());
             }
         }
     }
@@ -208,6 +237,19 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
         TextureRenderer.Render9Slice(Assets.textures.solution_editor.program_panel.program_length_glow, color.WithAlpha(0.6f), highlightBounds);
     }
 
+    private void LoopFromHere_RenderGhostInstructionIndicator(float deltaTime, InstructionReference hoveredInstruction, Bounds2 ghostInstructionBounds) {
+        if (!hoveredInstruction.part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
+            return;
+
+        LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
+        if (hoveredInstruction.instructionIndex <= loopRegionComponent.LoopEndIndex)
+            return;
+
+        loopRegionComponent.LoopEndAlpha = LoopRegionComponent.GhostAlpha;
+        Vector2 loopRegionEndPos = ghostInstructionBounds.GetEdgePosition(BoundsPosition.RightEdge);
+        TextureRenderer.Render(LoopRegionTextures.LoopRegionRight, Color.White.WithAlpha(LoopRegionComponent.GhostAlpha), loopRegionEndPos - LoopRegionTextures.LoopRegionRight.GetHalfSize());
+    }
+
     private void LoopFromHere_RenderLoopRegionPlacementIndicator(float deltaTime, PanelWParts panelWParts, Dictionary<Part, InstructionsWRef> partInstructions) {
         if (solEditScrn.currentInputMode is not LoopRegionInputMode
             || !LoopFromHere_GetIndexAt(InputManager.MousePos()).GetOrDefault(out Index2 hoveredIndex))
@@ -218,13 +260,14 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
             return;
 
         Vector2 loopRegionPos = LoopFromHere_GetIndexEdgeCenter(hoveredIndex, rightEdge: false);
-        TextureRenderer.Render(LoopRegionTextures.LoopRegionLeft, Color.White.WithAlpha(0.5f), loopRegionPos - LoopRegionTextures.LoopRegionLeft.GetHalfSize());
+        TextureRenderer.Render(LoopRegionTextures.LoopRegionLeft, Color.White.WithAlpha(LoopRegionComponent.GhostAlpha), loopRegionPos - LoopRegionTextures.LoopRegionLeft.GetHalfSize());
     }
 
     #endregion
 
     #region Utils
 
+    // todo: use regular `GetInstructionAt`?
     internal Maybe<Index2> LoopFromHere_GetIndexAt(Vector2 screenPos) {
         List<Part> parts = solEditScrn.GetSolution().GetOrderedProgrammables();
         Vector2 vector = screenPos - programAreaOffset - programOffset;
