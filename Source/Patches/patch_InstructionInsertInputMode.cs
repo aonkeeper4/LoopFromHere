@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using LoopFromHere;
 using LoopFromHere.Components;
+using LoopFromHere.Helpers;
 using LoopFromHere.UI;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
@@ -21,17 +22,26 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
         [MonoModIgnore]
         public Maybe<InstructionReference> field_1914;
 
+        internal Maybe<InstructionReference> LoopFromHere_coveredInstruction;
+
         internal bool LoopFromHere_hasLoopRegionStart, LoopFromHere_hasLoopRegionEnd;
     }
 
     [MonoModIgnore]
     private List<class_220> field_1908;
 
+    internal HashSet<LoopRegionComponent> LoopFromHere_editedLoopRegions;
+
+    private bool LoopFromHere_hasBeenProcessed;
+
     [MonoModILInject("IInputMode InstructionInsertInputMode::StartInputMode(SolutionEditorScreen,Vector2)")]
     public static void Patch_StartInputMode(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `InstructionInsertInputMode.StartInputMode(SolutionEditorScreen solEditScrn, Vector2 startMousePos)` to remove period override instruction limit...");
 
         MethodDefinition m_InstructionInsertInputMode_RemovePeriodOverrideLimit = method.DeclaringType.FindMethod("LoopFromHere_RemovePeriodOverrideLimit")!;
+        MethodDefinition m_InstructionInsertInputMode_GetEditedLoopRegions = method.DeclaringType.FindMethod("LoopFromHere_GetEditedLoopRegions")!;
+
+        FieldReference f_InstructionInsertInputMode_editedLoopRegions = method.DeclaringType.FindField("LoopFromHere_editedLoopRegions")!;
 
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
@@ -51,6 +61,26 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
 
             cursor.EmitLdarg0();
             cursor.EmitCall(m_InstructionInsertInputMode_RemovePeriodOverrideLimit);
+
+            /*
+             * IL_00fb: ldarg.0
+             * IL_00fc: ldfld class InstructionSelection SolutionEditorScreen::instructionSelection
+             * IL_0101: callvirt instance void InstructionSelection::Clear()
+             * IL_0106: ldloc.0
+             * IL_0107: ret
+             */
+            if (!cursor.TryGotoNext(MoveType.AfterLabel,
+                    instr => instr.MatchLdarg0(),
+                    instr => instr.MatchLdfld("SolutionEditorScreen", "instructionSelection"),
+                    instr => instr.MatchCallvirt("InstructionSelection", "Clear"),
+                    instr => instr.MatchLdloc0(),
+                    instr => instr.MatchRet()))
+                throw new Exception("Failed to patch `InstructionInsertInputMode.StartInputMode(SolutionEditorScreen solEditScrn, Vector2 startMousePos)`: Unable to find call to `InstructionSelection.Clear` to patch.");
+
+            cursor.EmitLdloc0();
+            cursor.EmitLdarg0();
+            cursor.EmitCall(m_InstructionInsertInputMode_GetEditedLoopRegions);
+            cursor.EmitStfld(f_InstructionInsertInputMode_editedLoopRegions);
         });
     }
 
@@ -58,9 +88,27 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
     private static bool LoopFromHere_RemovePeriodOverrideLimit(bool orig, SolutionEditorScreen solEditScrn)
         => orig || solEditScrn.GetSolution().parts.Any(p => p.HasComponent(LoopRegionComponent.Id));
 
+    // i think this is slightly too lenient but it should be fine?
+    private static HashSet<LoopRegionComponent> LoopFromHere_GetEditedLoopRegions(SolutionEditorScreen solEditScrn) {
+        HashSet<LoopRegionComponent> editedLoopRegions = [];
+        foreach (InstructionReference instruction in solEditScrn.instructionSelection) {
+            if (!instruction.part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
+                continue;
+
+            LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
+            if (AffectingLoopRegions() && instruction.instructionIndex == loopRegionComponent.LoopStartIndex
+                || instruction.instructionIndex == loopRegionComponent.LoopEndIndex)
+                editedLoopRegions.Add(loopRegionComponent);
+        }
+
+        return editedLoopRegions;
+    }
+
     [MonoModILInject("Process")]
     public static void Patch_Process(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `InstructionInsertInputMode.Process` to update loop regions when editing instructions...");
+
+        FieldDefinition f_InstructionInsertInputMode_hasBeenProcessed = method.DeclaringType.FindField("LoopFromHere_hasBeenProcessed")!;
 
         MethodDefinition m_InstructionInsertInputMode_UpdateHeldInstructions = method.DeclaringType.FindMethod("LoopFromHere_UpdateHeldInstructions")!;
         MethodDefinition m_InstructionInsertInputMode_RepositionLoopRegions = method.DeclaringType.FindMethod("LoopFromHere_RepositionLoopRegions")!;
@@ -74,21 +122,24 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
             ILCursor cursor = new(il);
             VariableDefinition l_newLoopRegionStartIndices = cursor.CreateLocal(t_Dictionary_LoopRegionComponent_int);
 
+            cursor.EmitLdarg0();
+            cursor.EmitLdcI4(1);
+            cursor.EmitStfld(f_InstructionInsertInputMode_hasBeenProcessed);
+
             /*
-             * IL_00f5: ldarg.1
-             * IL_00f6: ldfld class SolutionEditorProgramPanel SolutionEditorScreen::programPanel
-             * IL_00fb: callvirt instance valuetype Bounds2 SolutionEditorProgramPanel::ProgramAreaBounds()
-             * IL_0100: stloc.s 8
+             * IL_0157: ldc.i4.1
+             * IL_0158: call bool InputManager::IsClickReleased(valuetype MouseButtonType)
+             * IL_015d: brfalse IL_02ca
              */
             if (!cursor.TryGotoNext(MoveType.AfterLabel,
-                    instr => instr.MatchLdarg1(),
-                    instr => instr.MatchLdfld("SolutionEditorScreen", "programPanel"),
-                    instr => instr.MatchCallvirt("SolutionEditorProgramPanel", "ProgramAreaBounds"),
-                    instr => instr.MatchStloc(8)))
-                throw new Exception("Failed to patch `InstructionInsertInputMode.Process`: Unable to find assignment to `programAreaBounds` local to patch.");
+                    instr => instr.MatchLdcI4(1),
+                    instr => instr.MatchCall("InputManager", "IsClickReleased"),
+                    instr => instr.MatchBrfalse(out _)))
+                throw new Exception("Failed to patch `InstructionInsertInputMode.Process`: Unable to find call to `InputManager.IsClickReleased` to patch.");
 
             cursor.EmitLdarg0();
             cursor.EmitLdarg1();
+            cursor.EmitLdloc0();
             cursor.EmitLdloc2();
             cursor.EmitCallvirt(m_InstructionInsertInputMode_UpdateHeldInstructions);
             cursor.EmitStloc(l_newLoopRegionStartIndices);
@@ -107,7 +158,6 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
                 throw new Exception("Failed to patch `InstructionInsertInputMode.Process`: Unable to find beginning of `foreach` loop to patch.");
 
             cursor.EmitLdarg0();
-            cursor.EmitLdarg1();
             cursor.EmitLdloc(l_newLoopRegionStartIndices);
             cursor.EmitLdloc3();
             cursor.EmitLdloc1();
@@ -115,16 +165,33 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
         });
     }
 
-    private Dictionary<LoopRegionComponent, int> LoopFromHere_UpdateHeldInstructions(SolutionEditorScreen solEditScrn, Vector2 mouseDelta) {
+    // this code is the bane of my existence
+    private Dictionary<LoopRegionComponent, int> LoopFromHere_UpdateHeldInstructions(SolutionEditorScreen solEditScrn, enum_140 insertOperation, Vector2 mouseDelta) {
         Dictionary<LoopRegionComponent, int> newLoopRegionStartIndices = new();
+        if (insertOperation != (enum_140) 2) {
+            foreach (class_220 heldInstructionRaw in field_1908) {
+                patch_class_220 heldInstruction = (patch_class_220) (object) heldInstructionRaw;
+                heldInstruction.LoopFromHere_hasLoopRegionStart = heldInstruction.LoopFromHere_hasLoopRegionEnd = false;
 
-        Dictionary<Part, (int, patch_class_220)> rightmostHeldInstructions = new();
-        foreach (patch_class_220 heldInstruction in field_1908.Cast<patch_class_220>()) {
+                if (insertOperation == (enum_140) 1
+                    && heldInstruction.field_1914.GetOrDefault(out InstructionReference originalPosition)
+                    && originalPosition.part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)) {
+                    LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
+                    loopRegionComponent.LoopStartAlpha = loopRegionComponent.LoopEndAlpha = LoopRegionComponent.GhostAlpha;
+                }
+            }
+
+            return newLoopRegionStartIndices;
+        }
+
+        Dictionary<Part, patch_class_220> rightmostHeldInstructions = new();
+        foreach (class_220 heldInstructionRaw in field_1908) {
+            patch_class_220 heldInstruction = (patch_class_220) (object) heldInstructionRaw;
             heldInstruction.LoopFromHere_hasLoopRegionStart = heldInstruction.LoopFromHere_hasLoopRegionEnd = false;
 
             Vector2 coveredPosition = heldInstruction.field_1913 + mouseDelta + SolutionEditorProgramPanel.instructionSize / 2;
-            Maybe<InstructionReference> maybeCoveredInstruction = solEditScrn.programPanel.GetInstructionAt(coveredPosition);
-            if (!maybeCoveredInstruction.GetOrDefault(out InstructionReference coveredInstruction)) {
+            heldInstruction.LoopFromHere_coveredInstruction = solEditScrn.programPanel.GetInstructionAt(coveredPosition);
+            if (!heldInstruction.LoopFromHere_coveredInstruction.GetOrDefault(out InstructionReference coveredInstruction)) {
                 heldInstruction.LoopFromHere_hasLoopRegionStart = heldInstruction.LoopFromHere_hasLoopRegionEnd = false;
                 continue;
             }
@@ -142,30 +209,32 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
                     newLoopRegionStartIndices.Add(loopRegionComponent, coveredInstruction.instructionIndex);
                 }
             }
-            if (!rightmostHeldInstructions.TryGetValue(coveredInstruction.part, out (int index, patch_class_220 instruction) info)
-                || coveredInstruction.instructionIndex > info.index)
+            if (!rightmostHeldInstructions.TryGetValue(coveredInstruction.part, out patch_class_220 instruction)
+                || coveredInstruction.instructionIndex > instruction.LoopFromHere_coveredInstruction.GetValue().instructionIndex)
                 // add candidate for loop region end
-                rightmostHeldInstructions[coveredInstruction.part] = (coveredInstruction.instructionIndex, heldInstruction);
+                rightmostHeldInstructions[coveredInstruction.part] = heldInstruction;
         }
 
-        foreach ((Part part, (int index, patch_class_220 instruction) info) in rightmostHeldInstructions) {
+        foreach ((Part part, patch_class_220 instruction) in rightmostHeldInstructions) {
             if (!part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
                 continue;
 
-            LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
-            if (!loopRegionComponent.RecalculateEndIndex(solEditScrn).GetOrDefault(out int programEndIndex)
-                || info.index <= programEndIndex)
+            int coveredIndex = instruction.LoopFromHere_coveredInstruction.GetValue().instructionIndex;
+            InstructionsWRef partProgram = part.program.GetReferenceForPart(part, solEditScrn.GetSolution().GetTrackUnderPart(part));
+            ProgramHelper.ProgramInfo programInfo = new(partProgram);
+            if (!programInfo.IsEmpty && programInfo.EndIndex >= coveredIndex)
                 continue;
 
             // add loop region end
+            LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
             loopRegionComponent.LoopEndAlpha = LoopRegionComponent.GhostAlpha;
-            info.instruction.LoopFromHere_hasLoopRegionEnd = true;
+            instruction.LoopFromHere_hasLoopRegionEnd = true;
         }
 
         return newLoopRegionStartIndices;
     }
 
-    private void LoopFromHere_RepositionLoopRegions(SolutionEditorScreen solEditScrn, Dictionary<LoopRegionComponent, int> newLoopRegionStartIndices, Dictionary<InstructionReference, InstructionType> insertedInstructions, bool inserting) {
+    private void LoopFromHere_RepositionLoopRegions(Dictionary<LoopRegionComponent, int> newLoopRegionStartIndices, Dictionary<InstructionReference, InstructionType> insertedInstructions, bool inserting) {
         if (!AffectingLoopRegions())
             return;
 
@@ -182,10 +251,11 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
                     continue;
 
                 // hmm
+                EditableProgram program = position.part.program;
                 bool shouldPushLoopRegion = false;
-                int endOffset = position.part.program.GetInstruction(loopRegionComponent.LoopStartIndex).HasValue() ? 1 : 0;
+                int endOffset = program.GetInstruction(loopRegionComponent.LoopStartIndex).HasValue() ? 1 : 0;
                 for (int i = position.instructionIndex; i < loopRegionComponent.LoopStartIndex + endOffset; i++) {
-                    if (position.part.program.GetInstruction(i).HasValue())
+                    if (program.GetInstruction(i).HasValue())
                         shouldPushLoopRegion = true;
                     else {
                         shouldPushLoopRegion = false;
@@ -212,9 +282,6 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
             ILCursor cursor = new(il);
             VariableDefinition l_heldInstruction = cursor.CreateLocal(t_InstructionInsertInputMode_HeldInstruction);
 
-            // i'm not sure whether `get_Current` is safe to call multiple times so i'm using a local
-            // also i don't rly wanna deal with generic bs :p
-            // todo: maybe don't
             /*
              * IL_009f: ldloca.s 3
              * IL_00a1: call instance !0 valuetype [mscorlib]System.Collections.Generic.List`1/Enumerator<class InstructionInsertInputMode/class_220>::get_Current()

@@ -15,8 +15,6 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
     [MonoModIgnore]
     public patch_SolutionEditorProgramPanel(SolutionEditorScreen solEditScrn) : base(solEditScrn) { }
 
-    #region Exposed members
-
     [MonoModIgnore]
     private Vector2 programOffset;
 
@@ -27,10 +25,6 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
 
     [MonoModIgnore]
     private extern Vector2 GetScreenPosition(Index2 instructionPos);
-
-    #endregion
-
-    #region Patches
 
     [MonoModIgnore]
     private extern bool orig_IsLimitReached(InstructionType instructionType);
@@ -167,7 +161,6 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
 
             cursor.EmitLdarg0();
             cursor.EmitLdarg1();
-            cursor.EmitLdloc0();
             cursor.EmitLdloc(65);
             cursor.EmitCallvirt(m_SolutionEditorProgramPanel_RenderLoopRegionPlacementIndicator);
         });
@@ -181,14 +174,18 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
 
             LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
             if (loopRegionComponent.LoopStartIndex >= panelWParts.lowerBound) {
-                Vector2 loopRegionStartPos = LoopFromHere_GetIndexEdgeCenter(new Index2(loopRegionComponent.LoopStartIndex, i), rightEdge: false);
+                Vector2 loopRegionStartPos = LoopFromHere_GetInstructionEdgePosition(new Index2(loopRegionComponent.LoopStartIndex, i), BoundsPosition.LeftEdge);
                 TextureRenderer.Render(LoopRegionTextures.LoopRegionLeft, Color.White.WithAlpha(loopRegionComponent.LoopStartAlpha), loopRegionStartPos - LoopRegionTextures.LoopRegionLeft.GetHalfSize());
             }
             if (loopRegionComponent.LoopEndIndex <= panelWParts.upperBound) {
-                Vector2 loopRegionEndPos = LoopFromHere_GetIndexEdgeCenter(new Index2(loopRegionComponent.LoopEndIndex, i), rightEdge: true);
+                Vector2 loopRegionEndPos = LoopFromHere_GetInstructionEdgePosition(new Index2(loopRegionComponent.LoopEndIndex, i), BoundsPosition.RightEdge);
                 TextureRenderer.Render(LoopRegionTextures.LoopRegionRight, Color.White.WithAlpha(loopRegionComponent.LoopEndAlpha), loopRegionEndPos - LoopRegionTextures.LoopRegionRight.GetHalfSize());
             }
         }
+    }
+    private Vector2 LoopFromHere_GetInstructionEdgePosition(Index2 index, BoundsPosition boundsPosition) {
+        GetInstructionBounds(index, out _, out Bounds2 relativeBounds);
+        return relativeBounds.GetEdgePosition(boundsPosition);
     }
 
     private static bool LoopFromHere_UseCustomPeriodRendering(PanelWParts panel)
@@ -250,40 +247,16 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
         TextureRenderer.Render(LoopRegionTextures.LoopRegionRight, Color.White.WithAlpha(LoopRegionComponent.GhostAlpha), loopRegionEndPos - LoopRegionTextures.LoopRegionRight.GetHalfSize());
     }
 
-    private void LoopFromHere_RenderLoopRegionPlacementIndicator(float deltaTime, PanelWParts panelWParts, Dictionary<Part, InstructionsWRef> partInstructions) {
+    private void LoopFromHere_RenderLoopRegionPlacementIndicator(float deltaTime, Dictionary<Part, InstructionsWRef> partInstructions) {
         if (solEditScrn.currentInputMode is not LoopRegionInputMode
-            || !LoopFromHere_GetIndexAt(InputManager.MousePos()).GetOrDefault(out Index2 hoveredIndex))
+            || !GetInstructionAt(InputManager.MousePos()).GetOrDefault(out InstructionReference hoveredInstruction))
             return;
 
-        InstructionsWRef hoveredInstructions = partInstructions[panelWParts.parts[hoveredIndex.Y]];
-        if (!LoopRegionInputMode.CanPlaceLoopRegion(hoveredInstructions, hoveredIndex.X))
+        InstructionsWRef hoveredInstructions = partInstructions[hoveredInstruction.part];
+        if (!LoopRegionInputMode.CanPlaceLoopRegion(hoveredInstructions, hoveredInstruction.instructionIndex))
             return;
 
-        Vector2 loopRegionPos = LoopFromHere_GetIndexEdgeCenter(hoveredIndex, rightEdge: false);
+        Vector2 loopRegionPos = LoopFromHere_GetInstructionEdgePosition(new Index2(hoveredInstruction.instructionIndex, hoveredInstruction.part.programIndex), BoundsPosition.LeftEdge);
         TextureRenderer.Render(LoopRegionTextures.LoopRegionLeft, Color.White.WithAlpha(LoopRegionComponent.GhostAlpha), loopRegionPos - LoopRegionTextures.LoopRegionLeft.GetHalfSize());
     }
-
-    #endregion
-
-    #region Utils
-
-    // todo: use regular `GetInstructionAt`?
-    internal Maybe<Index2> LoopFromHere_GetIndexAt(Vector2 screenPos) {
-        List<Part> parts = solEditScrn.GetSolution().GetOrderedProgrammables();
-        Vector2 vector = screenPos - programAreaOffset - programOffset;
-        if (vector.X <= 0f || vector.Y >= programAreaHeight)
-            return MaybeHelper.empty;
-
-        Index2 index = new((int) MathF.Floor(vector.X / instructionSize.X + 0.5f), (int) MathF.Floor((programAreaHeight - vector.Y) / instructionSize.Y));
-        if (index.X >= 0 && index.Y >= 0 && index.Y < parts.Count)
-            return index;
-
-        return MaybeHelper.empty;
-    }
-    internal Vector2 LoopFromHere_GetIndexEdgeCenter(Index2 index, bool rightEdge = false) {
-        Vector2 relativePosition = GetScreenPosition(index) - programAreaOffset;
-        return relativePosition + new Vector2(rightEdge ? instructionSize.X : 0f, instructionSize.Y / 2f);
-    }
-
-    #endregion
 }
