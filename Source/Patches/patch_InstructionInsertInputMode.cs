@@ -32,11 +32,9 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
 
     internal HashSet<LoopRegionComponent> LoopFromHere_EditedLoopRegions;
 
-    private bool LoopFromHere_hasBeenProcessed;
-
     [MonoModILInject("IInputMode InstructionInsertInputMode::StartInputMode(SolutionEditorScreen,Vector2)")]
     public static void Patch_StartInputMode(MethodDefinition method, CustomAttribute attribute) {
-        MonoModRule.Modder.Log("[LoopFromHere] Patching `InstructionInsertInputMode.StartInputMode(SolutionEditorScreen solEditScrn, Vector2 startMousePos)` to remove period override instruction limit...");
+        MonoModRule.Modder.Log("[LoopFromHere] Patching `InstructionInsertInputMode.StartInputMode(SolutionEditorScreen solEditScrn, Vector2 startMousePos)` to update loop regions when editing instructions...");
 
         MethodDefinition m_InstructionInsertInputMode_RemovePeriodOverrideLimit = method.DeclaringType.FindMethod("LoopFromHere_RemovePeriodOverrideLimit")!;
         MethodDefinition m_InstructionInsertInputMode_GetEditedLoopRegions = method.DeclaringType.FindMethod("LoopFromHere_GetEditedLoopRegions")!;
@@ -108,8 +106,6 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
     public static void Patch_Process(MethodDefinition method, CustomAttribute attribute) {
         MonoModRule.Modder.Log("[LoopFromHere] Patching `InstructionInsertInputMode.Process` to update loop regions when editing instructions...");
 
-        FieldDefinition f_InstructionInsertInputMode_hasBeenProcessed = method.DeclaringType.FindField("LoopFromHere_hasBeenProcessed")!;
-
         MethodDefinition m_InstructionInsertInputMode_UpdateHeldInstructions = method.DeclaringType.FindMethod("LoopFromHere_UpdateHeldInstructions")!;
         MethodDefinition m_InstructionInsertInputMode_RepositionLoopRegions = method.DeclaringType.FindMethod("LoopFromHere_RepositionLoopRegions")!;
 
@@ -121,10 +117,6 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
             VariableDefinition l_newLoopRegionStartIndices = cursor.CreateLocal(t_Dictionary_LoopRegionComponent_int);
-
-            cursor.EmitLdarg0();
-            cursor.EmitLdcI4(1);
-            cursor.EmitStfld(f_InstructionInsertInputMode_hasBeenProcessed);
 
             /*
              * IL_0157: ldc.i4.1

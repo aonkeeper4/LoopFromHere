@@ -17,7 +17,7 @@ public class patch_CompiledProgramGrid {
 
     [MonoModILInject("GetInstructionForPart")]
     public static void Patch_GetInstructionForPart(MethodDefinition method, CustomAttribute attribute) {
-        MonoModRule.Modder.Log("[LoopFromHere] Patching `CompiledProgramGrid.GetInstructionForPart` to add support for custom looping behaviour...");
+        MonoModRule.Modder.Log("[LoopFromHere] Patching `CompiledProgramGrid.GetInstructionForPart` to add support for loop regions...");
 
         MethodDefinition m_CompiledProgramGrid_ModifyInstructionIndex = method.DeclaringType.FindMethod("LoopFromHere_ModifyInstructionIndex")!;
 
@@ -63,7 +63,7 @@ public class patch_CompiledProgramGrid {
 
     [MonoModILInject("GetLoopedCycle")]
     public static void Patch_GetLoopedCycle(MethodDefinition method, CustomAttribute attribute) {
-        MonoModRule.Modder.Log("[LoopFromHere] Patching `CompiledProgramGrid.GetLoopedCycle` to add support for custom looping behaviour...");
+        MonoModRule.Modder.Log("[LoopFromHere] Patching `CompiledProgramGrid.GetLoopedCycle` to add support for loop regions...");
 
         MethodDefinition m_CompiledProgramGrid_ModifyTotalPeriod = method.DeclaringType.FindMethod("LoopFromHere_ModifyTotalPeriod")!;
 
@@ -112,7 +112,7 @@ public class patch_CompiledProgramGrid {
 
     [MonoModILInject("FromSolution")]
     public static void Patch_FromSolution(MethodDefinition method, CustomAttribute attribute) {
-        MonoModRule.Modder.Log("[LoopFromHere] Patching `CompiledProgramGrid.FromSolution` to add support for custom looping behaviour...");
+        MonoModRule.Modder.Log("[LoopFromHere] Patching `CompiledProgramGrid.FromSolution` to add support for loop regions...");
 
         MethodDefinition m_CompiledProgramGrid_UseCustomCompilation = method.DeclaringType.FindMethod("LoopFromHere_UseCustomCompilation")!;
         MethodDefinition m_CompiledProgramGrid_CompileProgramGrid = method.DeclaringType.FindMethod("LoopFromHere_CompileProgramGrid")!;

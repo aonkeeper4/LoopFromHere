@@ -38,7 +38,7 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
 
     [MonoModILInject("RenderFrame")]
     public static void Patch_RenderFrame(MethodDefinition method, CustomAttribute attribute) {
-        MonoModRule.Modder.Log("[LoopFromHere] Patching `SolutionEditorProgramPanel.RenderFrame` to add UI for custom looping behaviour...");
+        MonoModRule.Modder.Log("[LoopFromHere] Patching `SolutionEditorProgramPanel.RenderFrame` to add UI for loop regions...");
 
         TypeDefinition t_SolutionEditorProgramPanel = method.DeclaringType;
         MethodDefinition m_SolutionEditorProgramPanel_RenderLoopRegionMarkers = t_SolutionEditorProgramPanel.FindMethod("LoopFromHere_RenderLoopRegionMarkers")!;
