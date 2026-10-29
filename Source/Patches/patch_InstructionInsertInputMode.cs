@@ -28,7 +28,7 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
     }
 
     [MonoModIgnore]
-    private List<class_220> field_1908;
+    private List<patch_class_220> field_1908;
 
     internal HashSet<LoopRegionComponent> LoopFromHere_EditedLoopRegions;
 
@@ -41,7 +41,7 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
         MethodDefinition m_InstructionInsertInputMode_RemovePeriodOverrideLimit = method.DeclaringType.FindMethod("LoopFromHere_RemovePeriodOverrideLimit")!;
         MethodDefinition m_InstructionInsertInputMode_GetEditedLoopRegions = method.DeclaringType.FindMethod("LoopFromHere_GetEditedLoopRegions")!;
 
-        FieldReference f_InstructionInsertInputMode_editedLoopRegions = method.DeclaringType.FindField("LoopFromHere_editedLoopRegions")!;
+        FieldReference f_InstructionInsertInputMode_editedLoopRegions = method.DeclaringType.FindField("LoopFromHere_EditedLoopRegions")!;
 
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
@@ -169,8 +169,7 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
     private Dictionary<LoopRegionComponent, int> LoopFromHere_UpdateHeldInstructions(SolutionEditorScreen solEditScrn, enum_140 insertOperation, Vector2 mouseDelta) {
         Dictionary<LoopRegionComponent, int> newLoopRegionStartIndices = new();
         if (insertOperation != (enum_140) 2) {
-            foreach (class_220 heldInstructionRaw in field_1908) {
-                patch_class_220 heldInstruction = (patch_class_220) (object) heldInstructionRaw;
+            foreach (patch_class_220 heldInstruction in field_1908) {
                 heldInstruction.LoopFromHere_HasLoopRegionStart = heldInstruction.LoopFromHere_HasLoopRegionEnd = false;
 
                 if (insertOperation == (enum_140) 1
@@ -185,8 +184,7 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
         }
 
         Dictionary<Part, patch_class_220> rightmostHeldInstructions = new();
-        foreach (class_220 heldInstructionRaw in field_1908) {
-            patch_class_220 heldInstruction = (patch_class_220) (object) heldInstructionRaw;
+        foreach (patch_class_220 heldInstruction in field_1908) {
             heldInstruction.LoopFromHere_HasLoopRegionStart = heldInstruction.LoopFromHere_HasLoopRegionEnd = false;
 
             Vector2 coveredPosition = heldInstruction.field_1913 + mouseDelta + SolutionEditorProgramPanel.instructionSize / 2;
@@ -320,16 +318,14 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
         });
     }
 
-    private void LoopFromHere_DrawLoopRegionMarkers(class_220 heldInstruction, Vector2 heldInstructionPos) {
-        bool drawLoopRegionStartMarker = ((patch_class_220) (object) heldInstruction).LoopFromHere_HasLoopRegionStart,
-            drawLoopRegionEndMarker = ((patch_class_220) (object) heldInstruction).LoopFromHere_HasLoopRegionEnd;
+    private void LoopFromHere_DrawLoopRegionMarkers(patch_class_220 heldInstruction, Vector2 heldInstructionPos) {
         Vector2 instructionOrigin = heldInstructionPos + new Vector2(0f, 2f);
 
-        if (drawLoopRegionStartMarker) {
+        if (heldInstruction.LoopFromHere_HasLoopRegionStart) {
             Vector2 markerPos = instructionOrigin + new Vector2(0f, SolutionEditorProgramPanel.instructionSize.Y / 2f);
             TextureRenderer.Render(LoopRegionTextures.LoopRegionLeft, markerPos - LoopRegionTextures.LoopRegionLeft.GetHalfSize());
         }
-        if (drawLoopRegionEndMarker) {
+        if (heldInstruction.LoopFromHere_HasLoopRegionEnd) {
             Vector2 markerPos = instructionOrigin + new Vector2(SolutionEditorProgramPanel.instructionSize.X, SolutionEditorProgramPanel.instructionSize.Y / 2f);
             TextureRenderer.Render(LoopRegionTextures.LoopRegionRight, markerPos - LoopRegionTextures.LoopRegionRight.GetHalfSize());
         }

@@ -86,8 +86,7 @@ public class patch_CompiledProgramGrid {
         });
     }
 
-    private static int LoopFromHere_ModifyTotalPeriod(int orig, CompiledProgramGrid grid) {
-        patch_CompiledProgramGrid programGrid = (patch_CompiledProgramGrid) (object) grid;
+    private static int LoopFromHere_ModifyTotalPeriod(int orig, patch_CompiledProgramGrid programGrid) {
         if (programGrid.programDict.Keys.All(p => !p.HasComponent(LoopRegionComponent.Id)))
             return orig;
 
