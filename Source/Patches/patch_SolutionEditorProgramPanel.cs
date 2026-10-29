@@ -173,12 +173,12 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
                 continue;
 
             LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
-            if (loopRegionComponent.LoopStartIndex >= panelWParts.lowerBound) {
-                Vector2 loopRegionStartPos = LoopFromHere_GetInstructionEdgePosition(new Index2(loopRegionComponent.LoopStartIndex, i), BoundsPosition.LeftEdge);
+            if (loopRegionComponent.StartIndex >= panelWParts.lowerBound) {
+                Vector2 loopRegionStartPos = LoopFromHere_GetInstructionEdgePosition(new Index2(loopRegionComponent.StartIndex, i), BoundsPosition.LeftEdge);
                 TextureRenderer.Render(LoopRegionTextures.LoopRegionLeft, Color.White.WithAlpha(loopRegionComponent.LoopStartAlpha), loopRegionStartPos - LoopRegionTextures.LoopRegionLeft.GetHalfSize());
             }
-            if (loopRegionComponent.LoopEndIndex <= panelWParts.upperBound) {
-                Vector2 loopRegionEndPos = LoopFromHere_GetInstructionEdgePosition(new Index2(loopRegionComponent.LoopEndIndex, i), BoundsPosition.RightEdge);
+            if (loopRegionComponent.EndIndex <= panelWParts.upperBound) {
+                Vector2 loopRegionEndPos = LoopFromHere_GetInstructionEdgePosition(new Index2(loopRegionComponent.EndIndex, i), BoundsPosition.RightEdge);
                 TextureRenderer.Render(LoopRegionTextures.LoopRegionRight, Color.White.WithAlpha(loopRegionComponent.LoopEndAlpha), loopRegionEndPos - LoopRegionTextures.LoopRegionRight.GetHalfSize());
             }
         }
@@ -214,9 +214,9 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
             (ProgramHelper.ProgramInfo info, Maybe<LoopRegionComponent> loopRegionComponent) = programInfo[part];
 
             if (loopRegionComponent.GetOrDefault(out LoopRegionComponent component)) {
-                LoopFromHere_RenderHighlight(i, component.LoopStartIndex, component.LoopEndIndex, Color.FromHex(0xf2c76d));
-                if (component.LoopStartIndex > info.StartIndex)
-                    LoopFromHere_RenderHighlight(i, info.StartIndex, component.LoopStartIndex - 1, Color.White);
+                LoopFromHere_RenderHighlight(i, component.StartIndex, component.EndIndex, Color.FromHex(0xf2c76d));
+                if (component.StartIndex > info.StartIndex)
+                    LoopFromHere_RenderHighlight(i, info.StartIndex, component.StartIndex - 1, Color.White);
             } else if (!info.IsEmpty) {
                 if (info.HasHalt)
                     LoopFromHere_RenderHighlight(i, info.StartIndex, info.EndIndex, Color.White);
@@ -239,7 +239,7 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
             return;
 
         LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
-        if (hoveredInstruction.instructionIndex <= loopRegionComponent.LoopEndIndex)
+        if (hoveredInstruction.instructionIndex <= loopRegionComponent.EndIndex)
             return;
 
         loopRegionComponent.LoopEndAlpha = LoopRegionComponent.GhostAlpha;

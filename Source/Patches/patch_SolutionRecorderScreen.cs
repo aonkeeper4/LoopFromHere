@@ -23,7 +23,7 @@ public class patch_SolutionRecorderScreen : SolutionRecorderScreen {
             if (!part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
                 continue;
 
-            if (cycle < ((LoopRegionComponent) component).LoopStartIndex)
+            if (cycle < ((LoopRegionComponent) component).StartIndex)
                 return true;
         }
 

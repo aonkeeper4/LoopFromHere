@@ -49,10 +49,10 @@ public class patch_CompiledProgramGrid {
             return orig;
 
         LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
-        int loopStartIndex = loopRegionComponent.LoopStartIndex - program.startIndex,
-            loopEndIndex = loopRegionComponent.LoopEndIndex - program.startIndex;
+        int loopStartIndex = loopRegionComponent.StartIndex - program.startIndex,
+            loopEndIndex = loopRegionComponent.EndIndex - program.startIndex;
 
-        int cyclesSinceStart = cycle - program.startIndex, cyclesSinceLooping = cycle - loopRegionComponent.LoopStartIndex;
+        int cyclesSinceStart = cycle - program.startIndex, cyclesSinceLooping = cycle - loopRegionComponent.StartIndex;
         if (cyclesSinceLooping < 0)
             return cyclesSinceStart;
 
@@ -99,8 +99,8 @@ public class patch_CompiledProgramGrid {
             int period;
             if (part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)) {
                 LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
-                int loopStartIndex = loopRegionComponent.LoopStartIndex - program.startIndex,
-                    loopEndIndex = loopRegionComponent.LoopEndIndex - program.startIndex;
+                int loopStartIndex = loopRegionComponent.StartIndex - program.startIndex,
+                    loopEndIndex = loopRegionComponent.EndIndex - program.startIndex;
                 period = loopEndIndex - loopStartIndex + 1;
             } else
                 period = program.instructions.Length;

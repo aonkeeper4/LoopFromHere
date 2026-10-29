@@ -22,15 +22,15 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
         [MonoModIgnore]
         public Maybe<InstructionReference> field_1914;
 
-        internal Maybe<InstructionReference> LoopFromHere_coveredInstruction;
+        internal Maybe<InstructionReference> LoopFromHere_CoveredInstruction;
 
-        internal bool LoopFromHere_hasLoopRegionStart, LoopFromHere_hasLoopRegionEnd;
+        internal bool LoopFromHere_HasLoopRegionStart, LoopFromHere_HasLoopRegionEnd;
     }
 
     [MonoModIgnore]
     private List<class_220> field_1908;
 
-    internal HashSet<LoopRegionComponent> LoopFromHere_editedLoopRegions;
+    internal HashSet<LoopRegionComponent> LoopFromHere_EditedLoopRegions;
 
     private bool LoopFromHere_hasBeenProcessed;
 
@@ -96,8 +96,8 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
                 continue;
 
             LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
-            if (AffectingLoopRegions() && instruction.instructionIndex == loopRegionComponent.LoopStartIndex
-                || instruction.instructionIndex == loopRegionComponent.LoopEndIndex)
+            if (AffectingLoopRegions() && instruction.instructionIndex == loopRegionComponent.StartIndex
+                || instruction.instructionIndex == loopRegionComponent.EndIndex)
                 editedLoopRegions.Add(loopRegionComponent);
         }
 
@@ -171,7 +171,7 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
         if (insertOperation != (enum_140) 2) {
             foreach (class_220 heldInstructionRaw in field_1908) {
                 patch_class_220 heldInstruction = (patch_class_220) (object) heldInstructionRaw;
-                heldInstruction.LoopFromHere_hasLoopRegionStart = heldInstruction.LoopFromHere_hasLoopRegionEnd = false;
+                heldInstruction.LoopFromHere_HasLoopRegionStart = heldInstruction.LoopFromHere_HasLoopRegionEnd = false;
 
                 if (insertOperation == (enum_140) 1
                     && heldInstruction.field_1914.GetOrDefault(out InstructionReference originalPosition)
@@ -187,12 +187,12 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
         Dictionary<Part, patch_class_220> rightmostHeldInstructions = new();
         foreach (class_220 heldInstructionRaw in field_1908) {
             patch_class_220 heldInstruction = (patch_class_220) (object) heldInstructionRaw;
-            heldInstruction.LoopFromHere_hasLoopRegionStart = heldInstruction.LoopFromHere_hasLoopRegionEnd = false;
+            heldInstruction.LoopFromHere_HasLoopRegionStart = heldInstruction.LoopFromHere_HasLoopRegionEnd = false;
 
             Vector2 coveredPosition = heldInstruction.field_1913 + mouseDelta + SolutionEditorProgramPanel.instructionSize / 2;
-            heldInstruction.LoopFromHere_coveredInstruction = solEditScrn.programPanel.GetInstructionAt(coveredPosition);
-            if (!heldInstruction.LoopFromHere_coveredInstruction.GetOrDefault(out InstructionReference coveredInstruction)) {
-                heldInstruction.LoopFromHere_hasLoopRegionStart = heldInstruction.LoopFromHere_hasLoopRegionEnd = false;
+            heldInstruction.LoopFromHere_CoveredInstruction = solEditScrn.programPanel.GetInstructionAt(coveredPosition);
+            if (!heldInstruction.LoopFromHere_CoveredInstruction.GetOrDefault(out InstructionReference coveredInstruction)) {
+                heldInstruction.LoopFromHere_HasLoopRegionStart = heldInstruction.LoopFromHere_HasLoopRegionEnd = false;
                 continue;
             }
 
@@ -201,16 +201,16 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
                 && originalPosition.part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)) {
                 LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
                 if (originalPosition.part == coveredInstruction.part
-                    && originalPosition.instructionIndex == loopRegionComponent.LoopStartIndex) {
+                    && originalPosition.instructionIndex == loopRegionComponent.StartIndex) {
                     // add loop region start
                     loopRegionComponent.LoopStartAlpha = LoopRegionComponent.GhostAlpha;
-                    heldInstruction.LoopFromHere_hasLoopRegionStart = true;
+                    heldInstruction.LoopFromHere_HasLoopRegionStart = true;
 
                     newLoopRegionStartIndices.Add(loopRegionComponent, coveredInstruction.instructionIndex);
                 }
             }
             if (!rightmostHeldInstructions.TryGetValue(coveredInstruction.part, out patch_class_220 instruction)
-                || coveredInstruction.instructionIndex > instruction.LoopFromHere_coveredInstruction.GetValue().instructionIndex)
+                || coveredInstruction.instructionIndex > instruction.LoopFromHere_CoveredInstruction.GetValue().instructionIndex)
                 // add candidate for loop region end
                 rightmostHeldInstructions[coveredInstruction.part] = heldInstruction;
         }
@@ -219,7 +219,7 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
             if (!part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
                 continue;
 
-            int coveredIndex = instruction.LoopFromHere_coveredInstruction.GetValue().instructionIndex;
+            int coveredIndex = instruction.LoopFromHere_CoveredInstruction.GetValue().instructionIndex;
             InstructionsWRef partProgram = part.program.GetReferenceForPart(part, solEditScrn.GetSolution().GetTrackUnderPart(part));
             ProgramHelper.ProgramInfo programInfo = new(partProgram);
             if (!programInfo.IsEmpty && programInfo.EndIndex >= coveredIndex)
@@ -228,7 +228,7 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
             // add loop region end
             LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
             loopRegionComponent.LoopEndAlpha = LoopRegionComponent.GhostAlpha;
-            instruction.LoopFromHere_hasLoopRegionEnd = true;
+            instruction.LoopFromHere_HasLoopRegionEnd = true;
         }
 
         return newLoopRegionStartIndices;
@@ -239,7 +239,7 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
             return;
 
         foreach ((LoopRegionComponent component, int newLoopRegionStartIndex) in newLoopRegionStartIndices)
-            component.LoopStartIndex = newLoopRegionStartIndex;
+            component.StartIndex = newLoopRegionStartIndex;
 
         if (inserting) {
             foreach ((InstructionReference position, _) in insertedInstructions) {
@@ -247,14 +247,14 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
                     continue;
 
                 LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
-                if (position.instructionIndex > loopRegionComponent.LoopStartIndex)
+                if (position.instructionIndex > loopRegionComponent.StartIndex)
                     continue;
 
                 // hmm
                 EditableProgram program = position.part.program;
                 bool shouldPushLoopRegion = false;
-                int endOffset = program.GetInstruction(loopRegionComponent.LoopStartIndex).HasValue() ? 1 : 0;
-                for (int i = position.instructionIndex; i < loopRegionComponent.LoopStartIndex + endOffset; i++) {
+                int endOffset = program.GetInstruction(loopRegionComponent.StartIndex).HasValue() ? 1 : 0;
+                for (int i = position.instructionIndex; i < loopRegionComponent.StartIndex + endOffset; i++) {
                     if (program.GetInstruction(i).HasValue())
                         shouldPushLoopRegion = true;
                     else {
@@ -264,7 +264,7 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
                 }
 
                 if (shouldPushLoopRegion)
-                    loopRegionComponent.LoopStartIndex++;
+                    loopRegionComponent.StartIndex++;
             }
         }
     }
@@ -321,8 +321,8 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
     }
 
     private void LoopFromHere_DrawLoopRegionMarkers(class_220 heldInstruction, Vector2 heldInstructionPos) {
-        bool drawLoopRegionStartMarker = ((patch_class_220) (object) heldInstruction).LoopFromHere_hasLoopRegionStart,
-            drawLoopRegionEndMarker = ((patch_class_220) (object) heldInstruction).LoopFromHere_hasLoopRegionEnd;
+        bool drawLoopRegionStartMarker = ((patch_class_220) (object) heldInstruction).LoopFromHere_HasLoopRegionStart,
+            drawLoopRegionEndMarker = ((patch_class_220) (object) heldInstruction).LoopFromHere_HasLoopRegionEnd;
         Vector2 instructionOrigin = heldInstructionPos + new Vector2(0f, 2f);
 
         if (drawLoopRegionStartMarker) {

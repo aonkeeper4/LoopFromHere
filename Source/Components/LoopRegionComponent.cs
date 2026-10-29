@@ -12,13 +12,13 @@ internal class LoopRegionComponent : IPartComponent {
 
     // only save `LoopStartIndex`, as everything should be recalculated based on that
     public static readonly Codec<IPartComponent> Codec = Codec<IPartComponent>.Create(
-        Codecs.INT.Seal<IPartComponent>(nameof(LoopStartIndex), component => (component as LoopRegionComponent)!.LoopStartIndex), // cmon c# you can infer the type you can do it
-        loopFromIndex => new LoopRegionComponent { LoopStartIndex = loopFromIndex }
+        Codecs.INT.Seal<IPartComponent>(nameof(StartIndex), component => (component as LoopRegionComponent)!.StartIndex), // cmon c# you can infer the type you can do it
+        loopFromIndex => new LoopRegionComponent { StartIndex = loopFromIndex }
     );
 
     private Part part;
 
-    public int LoopStartIndex, LoopEndIndex;
+    public int StartIndex, EndIndex;
 
     public const float NormalAlpha = 1f, GhostAlpha = 0.5f;
     public float LoopStartAlpha = NormalAlpha, LoopEndAlpha = NormalAlpha;
@@ -35,8 +35,8 @@ internal class LoopRegionComponent : IPartComponent {
     // don't clone render properties
     public void OnClone(ref Part cloned, Solution solution)
         => cloned.AddComponent(new LoopRegionComponent {
-            LoopStartIndex = LoopStartIndex,
-            LoopEndIndex = LoopEndIndex
+            StartIndex = StartIndex,
+            EndIndex = EndIndex
         });
     public void OnReset() { }
 
@@ -45,7 +45,7 @@ internal class LoopRegionComponent : IPartComponent {
         InstructionsWRef instructions = part.program.GetReferenceForPart(part, solution.GetTrackUnderPart(part));
 
         ProgramHelper.ProgramInfo info = new(instructions);
-        if (info.IsEmpty || info.HasHalt || LoopStartIndex > info.EndIndex)
+        if (info.IsEmpty || info.HasHalt || StartIndex > info.EndIndex)
             return MaybeHelper.empty;
 
         return info.EndIndex;

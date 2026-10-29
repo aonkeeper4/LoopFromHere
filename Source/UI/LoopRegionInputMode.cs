@@ -35,18 +35,18 @@ internal class LoopRegionInputMode : IInputMode {
                 LoopRegionComponent loopRegionComponent;
                 if (hoveredPart.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)) {
                     loopRegionComponent = (LoopRegionComponent) component;
-                    loopRegionComponent.LoopStartIndex = hoveredInstruction.instructionIndex;
+                    loopRegionComponent.StartIndex = hoveredInstruction.instructionIndex;
                 }
                 else
-                    hoveredPart.AddComponent(loopRegionComponent = new LoopRegionComponent { LoopStartIndex = hoveredInstruction.instructionIndex });
+                    hoveredPart.AddComponent(loopRegionComponent = new LoopRegionComponent { StartIndex = hoveredInstruction.instructionIndex });
 
-                loopRegionComponent.LoopEndIndex = loopRegionComponent.RecalculateEndIndex(solEditScrn).GetValue(); // will never throw since we know the placement is valid
+                loopRegionComponent.EndIndex = loopRegionComponent.RecalculateEndIndex(solEditScrn).GetValue(); // will never throw since we know the placement is valid
                 Assets.sounds.instruction_place.PlaySound(1f);
 
                 editMade = true;
             } else if (interpretedRightClick
                 && hoveredPart.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)
-                && ((LoopRegionComponent) component).LoopStartIndex == hoveredInstruction.instructionIndex) {
+                && ((LoopRegionComponent) component).StartIndex == hoveredInstruction.instructionIndex) {
                 // delete loop region
                 hoveredPart.RemoveComponent(LoopRegionComponent.Id);
                 Assets.sounds.instruction_remove.PlaySound(1f);
