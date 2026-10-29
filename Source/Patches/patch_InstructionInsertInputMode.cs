@@ -214,6 +214,7 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
 
             // i'm not sure whether `get_Current` is safe to call multiple times so i'm using a local
             // also i don't rly wanna deal with generic bs :p
+            // todo: maybe don't
             /*
              * IL_009f: ldloca.s 3
              * IL_00a1: call instance !0 valuetype [mscorlib]System.Collections.Generic.List`1/Enumerator<class InstructionInsertInputMode/class_220>::get_Current()
