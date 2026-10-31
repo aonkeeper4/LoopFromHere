@@ -37,9 +37,15 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
         MethodDefinition m_SolutionEditorProgramPanel_RenderLoopRegionPlacementIndicator = t_SolutionEditorProgramPanel.FindMethod("LoopFromHere_RenderLoopRegionPlacementIndicator")!;
 
         TypeDefinition t_Maybe = MonoModRule.Modder.FindType("Maybe`1").Resolve();
+        MethodDefinition m_Maybe_GetValue = t_Maybe.FindMethod("GetValue")!;
+
         TypeDefinition t_InstructionReference = MonoModRule.Modder.FindType("InstructionReference").Resolve();
         GenericInstanceType t_Maybe_InstructionReference = new(t_Maybe); t_Maybe_InstructionReference.GenericArguments.Add(t_InstructionReference);
-        MethodReference m_Maybe_InstructionReference_GetValue = t_Maybe.FindMethod("GetValue")!.Clone()!; m_Maybe_InstructionReference_GetValue.DeclaringType = t_Maybe_InstructionReference;
+        MethodReference m_Maybe_InstructionReference_GetValue = m_Maybe_GetValue.Clone()!; m_Maybe_InstructionReference_GetValue.DeclaringType = t_Maybe_InstructionReference;
+
+        TypeDefinition t_InstructionType = MonoModRule.Modder.FindType("InstructionType").Resolve();
+        GenericInstanceType t_Maybe_InstructionType = new(t_Maybe); t_Maybe_InstructionType.GenericArguments.Add(t_InstructionType);
+        MethodReference m_Maybe_InstructionType_GetValue = m_Maybe_GetValue.Clone()!; m_Maybe_InstructionType_GetValue.DeclaringType = t_Maybe_InstructionType;
 
         new ILContext(method).Invoke(il => {
             ILCursor cursor = new(il);
@@ -122,6 +128,8 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
                 throw new Exception("Failed to patch `SolutionEditorProgramPanel.RenderFrame`: Unable to find call to `TextureRenderer.Render` to patch.");
 
             cursor.EmitLdarg0();
+            cursor.EmitLdloca(1);
+            cursor.EmitCall(m_Maybe_InstructionType_GetValue);
             cursor.EmitLdloca(66);
             cursor.EmitCall(m_Maybe_InstructionReference_GetValue);
             cursor.EmitLdloc(85);
@@ -139,14 +147,14 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
                 throw new Exception("Failed to patch `SolutionEditorProgramPanel.RenderFrame`: Unable to find end of instruction rendering to patch.");
 
             cursor.EmitLdarg0();
+            cursor.EmitLdloc(65);
+            cursor.EmitCallvirt(m_SolutionEditorProgramPanel_RenderLoopRegionPlacementIndicator);
+
+            cursor.EmitLdarg0();
             cursor.EmitLdloc0();
             cursor.EmitLdloc(5);
             cursor.EmitLdloc(6);
             cursor.EmitCallvirt(m_SolutionEditorProgramPanel_RenderLoopRegionMarkers);
-
-            cursor.EmitLdarg0();
-            cursor.EmitLdloc(65);
-            cursor.EmitCallvirt(m_SolutionEditorProgramPanel_RenderLoopRegionPlacementIndicator);
         });
     }
 
@@ -159,11 +167,11 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
             LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
             if (loopRegionComponent.StartIndex >= panelWParts.lowerBound) {
                 Vector2 loopRegionStartPos = LoopFromHere_GetInstructionEdgePosition(new Index2(loopRegionComponent.StartIndex, i), BoundsPosition.LeftEdge);
-                TextureRenderer.Render(LoopRegionTextures.LoopRegionLeft, Color.White.WithAlpha(loopRegionComponent.LoopStartAlpha), loopRegionStartPos - LoopRegionTextures.LoopRegionLeft.GetHalfSize());
+                TextureRenderer.Render(LoopRegionTextures.LoopRegionLeft, Color.White.WithAlpha(loopRegionComponent.StartAlpha), loopRegionStartPos - LoopRegionTextures.LoopRegionLeft.GetHalfSize());
             }
             if (loopRegionComponent.EndIndex <= panelWParts.upperBound) {
                 Vector2 loopRegionEndPos = LoopFromHere_GetInstructionEdgePosition(new Index2(loopRegionComponent.EndIndex, i), BoundsPosition.RightEdge);
-                TextureRenderer.Render(LoopRegionTextures.LoopRegionRight, Color.White.WithAlpha(loopRegionComponent.LoopEndAlpha), loopRegionEndPos - LoopRegionTextures.LoopRegionRight.GetHalfSize());
+                TextureRenderer.Render(LoopRegionTextures.LoopRegionRight, Color.White.WithAlpha(loopRegionComponent.EndAlpha), loopRegionEndPos - LoopRegionTextures.LoopRegionRight.GetHalfSize());
             }
         }
     }
@@ -218,17 +226,18 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
         TextureRenderer.Render9Slice(Assets.textures.solution_editor.program_panel.program_length_glow, color.WithAlpha(0.6f), highlightBounds);
     }
 
-    private void LoopFromHere_RenderGhostInstructionIndicator(InstructionReference hoveredInstruction, Bounds2 ghostInstructionBounds) {
+    private void LoopFromHere_RenderGhostInstructionIndicator(InstructionType selectedInstructionType, InstructionReference hoveredInstruction, Bounds2 ghostInstructionBounds) {
         if (!hoveredInstruction.part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
             return;
 
         LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
-        if (hoveredInstruction.instructionIndex <= loopRegionComponent.EndIndex)
-            return;
-
-        loopRegionComponent.LoopEndAlpha = LoopRegionComponent.GhostAlpha;
-        Vector2 loopRegionEndPos = ghostInstructionBounds.GetEdgePosition(BoundsPosition.RightEdge);
-        TextureRenderer.Render(LoopRegionTextures.LoopRegionRight, Color.White.WithAlpha(LoopRegionComponent.GhostAlpha), loopRegionEndPos - LoopRegionTextures.LoopRegionRight.GetHalfSize());
+        if (selectedInstructionType.category == InstructionCategory.Halt)
+            loopRegionComponent.StartAlpha = loopRegionComponent.EndAlpha = LoopRegionComponent.GhostAlpha;
+        else if (hoveredInstruction.instructionIndex > loopRegionComponent.EndIndex) {
+            loopRegionComponent.EndAlpha = LoopRegionComponent.GhostAlpha;
+            Vector2 loopRegionEndPos = ghostInstructionBounds.GetEdgePosition(BoundsPosition.RightEdge);
+            TextureRenderer.Render(LoopRegionTextures.LoopRegionRight, Color.White.WithAlpha(LoopRegionComponent.GhostAlpha), loopRegionEndPos - LoopRegionTextures.LoopRegionRight.GetHalfSize());
+        }
     }
 
     private void LoopFromHere_RenderLoopRegionPlacementIndicator(Dictionary<Part, InstructionsWRef> partInstructions) {
@@ -239,6 +248,12 @@ public class patch_SolutionEditorProgramPanel : SolutionEditorProgramPanel {
         InstructionsWRef hoveredInstructions = partInstructions[hoveredInstruction.part];
         if (!LoopRegionInputMode.CanPlaceLoopRegion(hoveredInstructions, hoveredInstruction.instructionIndex))
             return;
+
+        if (hoveredInstruction.part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component)) {
+            LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
+            if (loopRegionComponent.StartIndex != hoveredInstruction.instructionIndex)
+                loopRegionComponent.StartAlpha = LoopRegionComponent.GhostAlpha;
+        }
 
         Vector2 loopRegionPos = LoopFromHere_GetInstructionEdgePosition(new Index2(hoveredInstruction.instructionIndex, hoveredInstruction.part.programIndex), BoundsPosition.LeftEdge);
         TextureRenderer.Render(LoopRegionTextures.LoopRegionLeft, Color.White.WithAlpha(LoopRegionComponent.GhostAlpha), loopRegionPos - LoopRegionTextures.LoopRegionLeft.GetHalfSize());

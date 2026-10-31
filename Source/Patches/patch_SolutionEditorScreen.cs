@@ -44,12 +44,8 @@ public class patch_SolutionEditorScreen : SolutionEditorScreen {
                 continue;
 
             LoopRegionComponent loopRegionComponent = (LoopRegionComponent) component;
-            if (loopRegionComponent.RecalculateEndIndex(this).GetOrDefault(out int newLoopEndIndex))
-                loopRegionComponent.EndIndex = newLoopEndIndex;
-            else if (currentInputMode is not patch_InstructionInsertInputMode insertInputMode
-                || !insertInputMode.LoopFromHere_EditedLoopRegions.Contains(loopRegionComponent))
-                part.RemoveComponent(LoopRegionComponent.Id);
-            loopRegionComponent.LoopStartAlpha = loopRegionComponent.LoopEndAlpha = LoopRegionComponent.NormalAlpha;
+            loopRegionComponent.StartAlpha = loopRegionComponent.EndAlpha = LoopRegionComponent.NormalAlpha;
+            loopRegionComponent.Recalculate(this);
         }
     }
 }
