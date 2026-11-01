@@ -13,9 +13,6 @@ using MonoMod.InlineRT;
 using MonoMod.Utils;
 using Quintessential.Components;
 
-// any instr edits can affect the end of a loop region
-// only moving the start instr can move a loop region
-//
 public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
     // can't inherit from this because it's sealed
     public class patch_class_220 {
