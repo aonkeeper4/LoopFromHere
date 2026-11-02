@@ -223,7 +223,7 @@ public class patch_InstructionInsertInputMode : InstructionInsertInputMode {
             Maybe<LoopRegionComponent> maybeLoopRegionComponent = MaybeHelper.empty;
             if (part.TryGetComponent(LoopRegionComponent.Id, out IPartComponent component))
                 maybeLoopRegionComponent = (LoopRegionComponent) component;
-            if (LoopFromHere_heldLoopRegions.TryGetValue(part, out LoopFromHere_HeldLoopRegion heldLoopRegion))
+            if (LoopFromHere_AffectingLoopRegions() && LoopFromHere_heldLoopRegions.TryGetValue(part, out LoopFromHere_HeldLoopRegion heldLoopRegion))
                 maybeLoopRegionComponent = heldLoopRegion.Component;
             if (!maybeLoopRegionComponent.GetOrDefault(out LoopRegionComponent loopRegionComponent))
                 continue;
