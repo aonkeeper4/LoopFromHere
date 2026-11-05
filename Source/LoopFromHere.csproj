@@ -27,8 +27,11 @@
     </ItemGroup>
 
     <!-- copy files to output directory after building -->
+    <!-- todo: replace this with the backmapper once that becomes standalone -->
     <Target Name="CopyFiles" AfterTargets="Build" Inputs="$(OutputPath)\$(AssemblyName).dll;$(OutputPath)\$(AssemblyName).pdb" Outputs="..\bin\$(AssemblyName).dll;..\bin\$(AssemblyName).pdb">
         <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="..\bin" />
         <Copy SourceFiles="$(OutputPath)\$(AssemblyName).pdb" DestinationFolder="..\bin" />
     </Target>
+
+    <!-- todo: add task to build a zip in Release mode (also waiting on the backmapper) -->
 </Project>
